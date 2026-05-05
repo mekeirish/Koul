@@ -7,7 +7,7 @@
     
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#ffcc00">
-    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/3443/3443429.png">
+    <link rel="apple-touch-icon" href="icone.png">
 
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-database-compat.js"></script>
@@ -185,6 +185,31 @@
         let pendingResId = null, pendingOrderId = null;
         let promoMessage = "BIENVENUE";
 
+        // --- FONCTION DE COMPRESSION ---
+        function compressImage(file, callback) {
+            if (!file) { callback(''); return; }
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = function (event) {
+                const img = new Image();
+                img.src = event.target.result;
+                img.onload = function () {
+                    const canvas = document.createElement('canvas');
+                    const MAX_WIDTH = 800; // Largeur max pour mobile
+                    const scaleSize = MAX_WIDTH / img.width;
+                    canvas.width = MAX_WIDTH;
+                    canvas.height = img.height * scaleSize;
+
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                    
+                    // On compresse à 70% de qualité en format JPEG pour gagner énormément de place
+                    const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+                    callback(dataUrl);
+                };
+            };
+        }
+
         function pushData() {
             db.ref('cloud_koul').set({ 
                 restaurants: restaurants || [], 
@@ -304,15 +329,25 @@
         function adminCreateRes() {
             const n = document.getElementById('adm-res-n').value, c = document.getElementById('adm-res-c').value, f = document.getElementById('adm-res-img').files[0];
             if(n && c) {
-                const r = new FileReader(); r.onload = (e) => { restaurants.push({id:Date.now(), name:n, code:c, img:e.target.result, plats:[], orders:[], eventHistory:[]}); logAdminEvent("SYSTEM", `Resto créé: ${n}`); renderAdminResList(); setNotif("RESTO AJOUTÉ"); pushData(); };
-                if(f) r.readAsDataURL(f); else r.onload({target:{result:''}});
+                compressImage(f, (compressedData) => {
+                    restaurants.push({id:Date.now(), name:n, code:c, img:compressedData, plats:[], orders:[], eventHistory:[]}); 
+                    logAdminEvent("SYSTEM", `Resto créé: ${n}`); 
+                    renderAdminResList(); 
+                    setNotif("RESTO AJOUTÉ"); 
+                    pushData();
+                });
             }
         }
         function adminCreateLiv() {
             const n = document.getElementById('adm-liv-n').value, c = document.getElementById('adm-liv-c').value, f = document.getElementById('adm-liv-img').files[0];
             if(n && c) {
-                const r = new FileReader(); r.onload = (e) => { livreurs.push({id:Date.now(), name:n, code:c, img:e.target.result, history:[]}); logAdminEvent("SYSTEM", `Livreur créé: ${n}`); renderAdminLivList(); setNotif("LIVREUR AJOUTÉ"); pushData(); };
-                if(f) r.readAsDataURL(f); else r.onload({target:{result:''}});
+                compressImage(f, (compressedData) => {
+                    livreurs.push({id:Date.now(), name:n, code:c, img:compressedData, history:[]}); 
+                    logAdminEvent("SYSTEM", `Livreur créé: ${n}`); 
+                    renderAdminLivList(); 
+                    setNotif("LIVREUR AJOUTÉ"); 
+                    pushData();
+                });
             }
         }
         function logAdminEvent(type, details) { 
@@ -372,8 +407,15 @@
         function addNewPlat() {
             const nInput = document.getElementById('new-n'), pInput = document.getElementById('new-p'), sInput = document.getElementById('new-s'), imgInput = document.getElementById('new-img');
             if(nInput.value && pInput.value) {
-                const r = new FileReader(); r.onload = (e) => { if(!currentRes.plats) currentRes.plats = []; currentRes.plats.push({id:Date.now(), n:nInput.value, p:parseInt(pInput.value), stock:parseInt(sInput.value)||0, img:e.target.result}); logAdminEvent(currentRes.name, `Plat ajouté: ${nInput.value}`); setNotif("PLAT AJOUTÉ"); renderProPlats(); nInput.value = ""; pInput.value = ""; sInput.value = ""; imgInput.value = ""; pushData(); };
-                if(imgInput.files[0]) r.readAsDataURL(imgInput.files[0]); else r.onload({target:{result:''}});
+                compressImage(imgInput.files[0], (compressedData) => {
+                    if(!currentRes.plats) currentRes.plats = []; 
+                    currentRes.plats.push({id:Date.now(), n:nInput.value, p:parseInt(pInput.value), stock:parseInt(sInput.value)||0, img:compressedData}); 
+                    logAdminEvent(currentRes.name, `Plat ajouté: ${nInput.value}`); 
+                    setNotif("PLAT AJOUTÉ (COMPRESSÉ)"); 
+                    renderProPlats(); 
+                    nInput.value = ""; pInput.value = ""; sInput.value = ""; imgInput.value = ""; 
+                    pushData();
+                });
             }
         }
         function renderProPlats() { const l = document.getElementById('manage-plats'); l.innerHTML = ''; if(currentRes.plats) currentRes.plats.forEach((p, i) => { l.innerHTML += `<div class="plat-manage-card"><img src="${p.img}" class="mini-img"><div style="flex:1"><b>${p.n}</b><br><small>${p.p} DZD</small></div><div style="display:flex; align-items:center"><input type="number" value="${p.stock}" id="stk-${i}" style="width:50px; background:#222; border:1px solid #555; color:white; padding:5px"><button class="btn-icon" onclick="updateStock(${i})">OK</button><button class="btn-icon" onclick="deletePlat(${p.id})" style="color:red">X</button></div></div>`; }); }
@@ -508,7 +550,6 @@
         function logoutLivreur() { currentLivreur = null; goToHome(); }
         function exportHistory() { let content = "HISTORIQUE KOUL\n\n"; adminHistory.forEach(h => { content += `[${h.date} ${h.time}] ${h.type}: ${h.details}\n`; }); const blob = new Blob([content], { type: 'text/plain' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `log_koul.txt`; a.click(); }
         
-        // Service Worker Registration for PWA
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('sw.js');
