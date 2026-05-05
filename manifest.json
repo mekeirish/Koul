@@ -1,14 +1,14 @@
 {
-  "name": "Koul - Gestion Restauration",
+  "name": "Koul",
   "short_name": "Koul",
-  "description": "Application de gestion de restauration et livraisons",
+  "description": "Application Koul",
   "start_url": "index.html",
   "display": "standalone",
   "background_color": "#121212",
   "theme_color": "#ffcc00",
   "icons": [
     {
-      "src": "https://cdn-icons-png.flaticon.com/512/3443/3443429.png",
+      "src": "icone.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
