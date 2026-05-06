@@ -26,7 +26,6 @@
 
         header { padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; }
         .btn-pro-header { background-color: var(--primary); color: #000; border: none; padding: 8px 15px; border-radius: 5px; font-weight: bold; cursor: pointer; }
-        #install-btn { background-color: white; color: black; display: none; margin-right: 8px; }
 
         .numpad-container { display: none; padding: 25px; background: #1a1a1a; border: 2px solid var(--primary); text-align: center; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 3000; border-radius: 20px; box-shadow: 0 0 40px rgba(0,0,0,0.9); width: 280px; }
         .pin-display { background: #000; color: var(--primary); font-size: 1.8rem; padding: 15px; border-radius: 12px; margin-bottom: 20px; letter-spacing: 8px; height: 40px; display: flex; align-items: center; justify-content: center; border: 1px solid #333; }
@@ -74,10 +73,7 @@
 
     <header>
         <h1 onclick="goToHome()" style="cursor:pointer">Koul</h1>
-        <div style="display: flex; align-items: center;">
-            <button id="install-btn" class="btn-pro-header">Installer</button>
-            <button class="btn-pro-header" onclick="toggleLoginArea()">Pro</button>
-        </div>
+        <button class="btn-pro-header" onclick="toggleLoginArea()">Pro</button>
     </header>
 
     <div id="login-container" class="numpad-container"><div class="pin-display" id="pin-view"></div><div class="numpad" id="pad-main"></div><button onclick="toggleLoginArea()" style="margin-top:15px; background:none; border:none; color:#888">ANNULER</button></div>
@@ -189,7 +185,7 @@
         let pendingResId = null, pendingOrderId = null;
         let promoMessage = "BIENVENUE";
 
-        // --- COMPRESSION ---
+        // --- FONCTION DE COMPRESSION ---
         function compressImage(file, callback) {
             if (!file) { callback(''); return; }
             const reader = new FileReader();
@@ -199,13 +195,17 @@
                 img.src = event.target.result;
                 img.onload = function () {
                     const canvas = document.createElement('canvas');
-                    const MAX_WIDTH = 800;
+                    const MAX_WIDTH = 800; // Largeur max pour mobile
                     const scaleSize = MAX_WIDTH / img.width;
                     canvas.width = MAX_WIDTH;
                     canvas.height = img.height * scaleSize;
+
                     const ctx = canvas.getContext('2d');
                     ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                    callback(canvas.toDataURL('image/jpeg', 0.7));
+                    
+                    // On compresse à 70% de qualité en format JPEG pour gagner énormément de place
+                    const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+                    callback(dataUrl);
                 };
             };
         }
@@ -219,10 +219,8 @@
             });
         }
 
-        // --- GESTION DU CHARGEMENT ---
         db.ref('cloud_koul').on('value', (snapshot) => {
             const data = snapshot.val();
-            // Cacher le loader quoi qu'il arrive dès qu'on reçoit une réponse
             document.getElementById('loading-screen').style.display = 'none';
 
             if(data) {
@@ -230,18 +228,23 @@
                 livreurs = data.livreurs || [];
                 adminHistory = data.adminHistory || [];
                 promoMessage = data.promoMessage || "BIENVENUE";
-                document.getElementById('notif-message').innerText = promoMessage;
                 
-                if(currentRes) currentRes = restaurants.find(r => r.id === currentRes.id) || currentRes;
-                if(currentLivreur) currentLivreur = livreurs.find(l => l.id === currentLivreur.id) || currentLivreur;
+                document.getElementById('notif-message').innerText = promoMessage;
+
+                if(currentRes) {
+                    const updatedRes = restaurants.find(r => r.id === currentRes.id);
+                    if(updatedRes) currentRes = updatedRes;
+                }
+                if(currentLivreur) {
+                    const updatedLiv = livreurs.find(l => l.id === currentLivreur.id);
+                    if(updatedLiv) currentLivreur = updatedLiv;
+                }
                 
                 refreshCurrentView();
             }
-            // Toujours ré-initialiser la grille principale
-            init();
-        }, (error) => {
-            console.error(error);
-            document.getElementById('loading-screen').style.display = 'none';
+            if(document.getElementById('view-restaurants').classList.contains('active')) {
+                init();
+            }
         });
 
         function refreshCurrentView() {
@@ -277,7 +280,7 @@
         function generatePads() {
             const pads = ['pad-main', 'numpad-client', 'numpad-delivery'];
             pads.forEach(id => {
-                const el = document.getElementById(id); if(!el) return; el.innerHTML = '';
+                const el = document.getElementById(id); el.innerHTML = '';
                 for(let i=1; i<=9; i++) el.innerHTML += `<button class="num-btn" onclick="pressPad('${id}','${i}')">${i}</button>`;
                 el.innerHTML += `<button class="num-btn" style="color:red" onclick="pressPad('${id}','C')">C</button>`;
                 el.innerHTML += `<button class="num-btn" onclick="pressPad('${id}','0')">${0}</button>`;
@@ -408,7 +411,8 @@
                     if(!currentRes.plats) currentRes.plats = []; 
                     currentRes.plats.push({id:Date.now(), n:nInput.value, p:parseInt(pInput.value), stock:parseInt(sInput.value)||0, img:compressedData}); 
                     logAdminEvent(currentRes.name, `Plat ajouté: ${nInput.value}`); 
-                    setNotif("PLAT AJOUTÉ"); renderProPlats(); 
+                    setNotif("PLAT AJOUTÉ (COMPRESSÉ)"); 
+                    renderProPlats(); 
                     nInput.value = ""; pInput.value = ""; sInput.value = ""; imgInput.value = ""; 
                     pushData();
                 });
@@ -448,7 +452,7 @@
                 });
                 logResEvent(currentRes, "COMMANDE REJETÉE", o); 
                 currentRes.orders.splice(idx, 1);
-                renderProOrders(); setNotif("COMMANDE ANNULÉE"); pushData(); 
+                renderProOrders(); setNotif("COMMANDE ANNULÉE (STOCK RENDU)"); pushData(); 
             }
         }
         
@@ -466,22 +470,34 @@
             const l = document.getElementById('liv-orders'); l.innerHTML = '<h3>Missions</h3>';
             const isBusy = hasActiveOrder(currentLivreur.id);
             const myHiddenOrders = JSON.parse(localStorage.getItem(`koul_hidden_orders_${currentLivreur.id}`) || '[]');
+
             restaurants.forEach(res => {
                 if(res.orders) res.orders.forEach(o => {
                     if(!myHiddenOrders.includes(o.id) && (o.status === 'waiting' || (o.status === 'shipping' && o.livId === currentLivreur.id))) {
                         const canTake = !isBusy && o.status === 'waiting';
                         const isBeingShippedByMe = o.status === 'shipping' && o.livId === currentLivreur.id;
-                        l.innerHTML += `<div class="order-card-pro"><b style="color:var(--primary)">${res.name}</b><br><b>Client: ${o.client}</b><div class="order-actions">${canTake ? `<button class="btn-finish" onclick="takeOrd(${res.id}, ${o.id})">PRENDRE</button>` : ''}${o.status === 'waiting' ? `<button class="btn-reject" onclick="ignoreOrd(${o.id})">MASQUER</button>` : ''}${isBeingShippedByMe ? `<a href="tel:${o.tel}" class="btn-call">APPELER</a>` : ''}${isBeingShippedByMe ? `<button class="btn-finish" style="background:#28a745" onclick="openValPin(${res.id}, ${o.id})">VALIDER</button>` : ''}</div></div>`;
+
+                        l.innerHTML += `
+                            <div class="order-card-pro">
+                                <b style="color:var(--primary)">${res.name}</b><br>
+                                <b>Client: ${o.client}</b><br>
+                                <div class="order-actions">
+                                    ${canTake ? `<button class="btn-finish" onclick="takeOrd(${res.id}, ${o.id})">PRENDRE</button>` : ''}
+                                    ${o.status === 'waiting' ? `<button class="btn-reject" onclick="ignoreOrd(${o.id})">MASQUER</button>` : ''}
+                                    ${isBeingShippedByMe ? `<a href="tel:${o.tel}" class="btn-call">APPELER</a>` : ''}
+                                    ${isBeingShippedByMe ? `<button class="btn-finish" style="background:#28a745" onclick="openValPin(${res.id}, ${o.id})">VALIDER LIVRAISON</button>` : ''}
+                                </div>
+                            </div>`;
                     }
                 });
             });
         }
 
         function takeOrd(rid, oid) {
-            if(hasActiveOrder(currentLivreur.id)) return setNotif("DÉJÀ UNE LIVRAISON EN COURS");
+            if(hasActiveOrder(currentLivreur.id)) return setNotif("VOUS AVEZ DÉJÀ UNE LIVRAISON");
             const r = restaurants.find(x=>x.id===rid); const o = r.orders.find(x=>x.id===oid);
             o.status = 'shipping'; o.livId = currentLivreur.id; o.livName = currentLivreur.name;
-            logResEvent(r, `PRISE PAR ${currentLivreur.name}`, o);
+            logResEvent(r, `PRISE PAR LIVREUR (${currentLivreur.name})`, o);
             setNotif("COMMANDE RÉCUPÉRÉE"); renderLivreurOrders(); pushData();
         }
 
@@ -490,7 +506,8 @@
             let myHiddenOrders = JSON.parse(localStorage.getItem(storageKey) || '[]');
             myHiddenOrders.push(oid); 
             localStorage.setItem(storageKey, JSON.stringify(myHiddenOrders));
-            renderLivreurOrders(); setNotif("COMMANDE MASQUÉE"); 
+            renderLivreurOrders(); 
+            setNotif("COMMANDE MASQUÉE"); 
         }
 
         function openValPin(rid, oid) { pendingResId = rid; pendingOrderId = oid; deliveryTempPin = ""; document.getElementById('delivery-pin-view').innerText = ""; document.getElementById('delivery-validation-container').style.display = 'block'; }
@@ -503,9 +520,10 @@
                 logResEvent(r, `LIVRÉE PAR ${currentLivreur ? currentLivreur.name : 'PRO'}`, final);
                 if(currentLivreur) { 
                     if(!currentLivreur.history) currentLivreur.history = []; 
-                    currentLivreur.history.push({ resName: r.name, date: new Date().toLocaleDateString(), time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) }); 
+                    const now = new Date();
+                    currentLivreur.history.push({ resName: r.name, date: now.toLocaleDateString(), time: String(now.getHours()).padStart(2, '0') + ":" + String(now.getMinutes()).padStart(2, '0') }); 
                 }
-                setNotif("LIVRÉ !"); pushData(); closeDeliveryPin(); refreshCurrentView();
+                setNotif("LIVRÉ !"); pushData(); closeDeliveryPin(); if(currentLivreur) { renderLivreurOrders(); renderLivreurHistory(); } if(currentRes) { renderProOrders(); renderResHistory(); }
             } else { vibrate([50, 50]); setNotif("CODE INCORRECT"); }
         }
 
@@ -518,15 +536,7 @@
             }
         }
 
-        function init() { 
-            const grid = document.getElementById('res-grid'); if(!grid) return;
-            grid.innerHTML = ''; 
-            restaurants.forEach(res => { 
-                grid.innerHTML += `<div class="card" onclick="openClientMenu(${res.id})"><img src="${res.img || 'https://via.placeholder.com/150'}"><br><b>${res.name}</b></div>`; 
-            }); 
-            generatePads(); 
-        }
-
+        function init() { const grid = document.getElementById('res-grid'); grid.innerHTML = ''; restaurants.forEach(res => { grid.innerHTML += `<div class="card" onclick="openClientMenu(${res.id})"><img src="${res.img || 'https://via.placeholder.com/150'}"><br><b>${res.name}</b></div>`; }); generatePads(); }
         function openClientMenu(rid) { currentRes = restaurants.find(x=>x.id===rid); showSection('view-menu-client'); document.getElementById('client-res-name').innerText = currentRes.name; renderClientPlats(); }
         function toggleZoom(img) { img.classList.toggle('zoom-image'); }
         function renderClientPlats() { const l = document.getElementById('plats-list-client'); l.innerHTML = ''; if(currentRes.plats) currentRes.plats.forEach(p => { const qty = cart[p.id] ? cart[p.id].qte : 0; l.innerHTML += `<div style="display:flex; align-items:center; gap:10px; background:#333; padding:10px; border-radius:10px; margin-bottom:10px"><img src="${p.img}" class="img-plat-client" onclick="toggleZoom(this)"><div style="flex:1"><b>${p.n}</b><br>${p.p} DZD <br><small>Dispo: ${p.stock}</small></div><div style="display:flex; align-items:center; gap:10px"><button onclick="changeQty(${p.id}, -1)">-</button><span>${qty}</span><button onclick="changeQty(${p.id}, 1)">+</button></div></div>`; }); }
@@ -534,20 +544,18 @@
         function updateCartUI() { const f = document.getElementById('footer-cart'), l = document.getElementById('cart-items-list'); if(!Object.keys(cart).length || !document.getElementById('view-menu-client').classList.contains('active')) { f.style.display='none'; return; } f.style.display='block'; l.innerHTML = ''; let t = 0; Object.keys(cart).forEach(k => { t += cart[k].p * cart[k].qte; l.innerHTML += `<div>${cart[k].qte}x ${cart[k].n}</div>`; }); document.getElementById('cart-total').innerText = t; }
         function openClientPin() { if(!document.getElementById('c-name').value) return setNotif("NOM REQUIS"); document.getElementById('client-pin-container').style.display='block'; clientTempPin=""; document.getElementById('client-pin-view').innerText=""; }
         function closeClientPin() { document.getElementById('client-pin-container').style.display='none'; }
-        function confirmClientOrder() { if(clientTempPin.length<4) return; const itemsList = Object.values(cart); if(!currentRes.orders) currentRes.orders = []; itemsList.forEach(item => { const plat = currentRes.plats.find(p => p.id === item.id); if(plat) plat.stock -= item.qte; }); const order = { id: Date.now(), client: document.getElementById('c-name').value, tel: document.getElementById('c-tel').value, rawItems: itemsList, itemsText: itemsList.map(i => `${i.qte}x ${i.n}`).join(', '), total: document.getElementById('cart-total').innerText, pin: clientTempPin, status: 'new' }; currentRes.orders.push(order); logResEvent(currentRes, "NOUVELLE COMMANDE", order); setNotif("COMMANDE RÉUSSIE"); closeClientPin(); pushData(); goToHome(); }
+        function confirmClientOrder() { if(clientTempPin.length<4) return; const itemsList = Object.values(cart); if(!currentRes.orders) currentRes.orders = []; itemsList.forEach(item => { const plat = currentRes.plats.find(p => p.id === item.id); if(plat) plat.stock -= item.qte; }); const order = { id: Date.now(), client: document.getElementById('c-name').value, tel: document.getElementById('c-tel').value, rawItems: itemsList, itemsText: itemsList.map(i => `${i.qte}x ${i.n}`).join(', '), total: document.getElementById('cart-total').innerText, pin: clientTempPin, status: 'new' }; currentRes.orders.push(order); logResEvent(currentRes, "NOUVELLE COMMANDE", order); setNotif("COMMANDE RÉUSIE"); closeClientPin(); pushData(); goToHome(); }
         function showClearConfirm(show = true) { document.getElementById('clear-confirm-panel').style.display = show ? 'block' : 'none'; }
         function toggleSec(id) { const s = document.getElementById(id); s.style.display = s.style.display==='block'?'none':'block'; }
         function logoutLivreur() { currentLivreur = null; goToHome(); }
         function exportHistory() { let content = "HISTORIQUE KOUL\n\n"; adminHistory.forEach(h => { content += `[${h.date} ${h.time}] ${h.type}: ${h.details}\n`; }); const blob = new Blob([content], { type: 'text/plain' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `log_koul.txt`; a.click(); }
         
-        // --- INSTALLATION PWA ---
-        let deferredPrompt;
-        const btnInstall = document.getElementById('install-btn');
-        window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); deferredPrompt = e; btnInstall.style.display = 'block'; });
-        btnInstall.addEventListener('click', async () => { if (deferredPrompt) { deferredPrompt.prompt(); deferredPrompt = null; btnInstall.style.display = 'none'; } });
-
-        // Démarrage initial au cas où Firebase tarde
-        setTimeout(() => { document.getElementById('loading-screen').style.display = 'none'; init(); }, 3000);
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('sw.js');
+            });
+        }
+        init();
     </script>
 </body>
 </html>
