@@ -221,15 +221,17 @@
                 document.getElementById('notif-message').innerText = promoMessage;
                 if(currentRes) currentRes = restaurants.find(r => r.id === currentRes.id);
                 if(currentLivreur) currentLivreur = livreurs.find(l => l.id === currentLivreur.id);
+                
+                // On rafraîchit toujours la grille client lors d'un changement DB
+                init();
                 refreshCurrentView();
             }
-            if(document.getElementById('view-restaurants').classList.contains('active')) init();
         });
 
         function refreshCurrentView() {
             if(document.getElementById('view-admin-space').classList.contains('active')) { renderAdminResList(); renderAdminLivList(); renderAdminHistory(); }
-            if(document.getElementById('view-pro-space').classList.contains('active') && currentRes) { renderProOrders(); renderProPlats(); renderResHistory(); }
-            if(document.getElementById('view-livreur-space').classList.contains('active') && currentLivreur) { renderLivreurOrders(); renderLivreurHistory(); }
+            if(document.getElementById('view-pro-space').classList.contains('active') && currentRes) { renderProOrders(); renderProPlats(); }
+            if(document.getElementById('view-livreur-space').classList.contains('active') && currentLivreur) { renderLivreurOrders(); }
         }
 
         const vibrate = (ms = 50) => { if(navigator.vibrate) navigator.vibrate(ms); };
@@ -311,13 +313,20 @@
             const l = document.getElementById('list-res-to-manage'); l.innerHTML = '';
             restaurants.forEach(r => l.innerHTML += `<div style="display:flex;justify-content:space-between;align-items:center;background:#333;padding:10px;margin-bottom:5px;border-radius:5px"><span><b>${r.name}</b> <small>(Code: ${r.code})</small></span><button onclick="deleteRes(${r.id})" style="color:#ff4444;border:none;background:none;font-weight:bold;padding:5px">X</button></div>`);
         }
-        function deleteRes(id) { if(confirm("Supprimer ?")) { restaurants = restaurants.filter(x=>x.id!==id); pushData(); } }
+        
+        function deleteRes(id) { 
+            if(confirm("Supprimer ce restaurant ?")) { 
+                restaurants = restaurants.filter(x => x.id !== id); 
+                pushData(); 
+                renderAdminResList(); // Mise à jour immédiate côté Admin
+            } 
+        }
         
         function renderAdminLivList() {
             const l = document.getElementById('list-liv-to-manage'); l.innerHTML = '';
             livreurs.forEach(v => l.innerHTML += `<div style="display:flex;justify-content:space-between;align-items:center;background:#333;padding:10px;margin-bottom:5px;border-radius:5px"><span><b>${v.name}</b> <small>(Code: ${v.code})</small></span><button onclick="deleteLiv(${v.id})" style="color:#ff4444;border:none;background:none;font-weight:bold;padding:5px">X</button></div>`);
         }
-        function deleteLiv(id) { if(confirm("Supprimer ?")) { livreurs = livreurs.filter(x=>x.id!==id); pushData(); } }
+        function deleteLiv(id) { if(confirm("Supprimer ?")) { livreurs = livreurs.filter(x=>x.id!==id); pushData(); renderAdminLivList(); } }
 
         function logAdminEvent(type, details) { const now = new Date(); adminHistory.unshift({ type, details, time: now.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}), date: now.toLocaleDateString() }); pushData(); }
         function renderAdminHistory() { const l = document.getElementById('admin-hist-list'); l.innerHTML = ''; adminHistory.forEach(h => l.innerHTML += `<div class="hist-card"><span class="type-tag">${h.type}</span><br><b>${h.details}</b><br><small>${h.date} ${h.time}</small></div>`); }
@@ -342,7 +351,7 @@
             });
         }
         function updateStock(i) { currentRes.plats[i].stock = parseInt(document.getElementById(`stk-${i}`).value); pushData(); setNotif("STOCK MAJ"); }
-        function deletePlat(id) { currentRes.plats = currentRes.plats.filter(x=>x.id!==id); pushData(); }
+        function deletePlat(id) { currentRes.plats = currentRes.plats.filter(x=>x.id!==id); pushData(); renderProPlats(); }
 
         function renderProOrders() {
             const l = document.getElementById('orders-list-pro'); l.innerHTML = '<h3>Commandes</h3>';
@@ -383,10 +392,12 @@
             restaurants.forEach(r => g.innerHTML += `<div class="card" onclick="openMenu(${r.id})"><img src="${r.img}"><b>${r.name}</b></div>`);
             generatePads();
         }
-        function openMenu(id) { currentRes = restaurants.find(x=>x.id===id); showSection('view-menu-client'); document.getElementById('client-res-name').innerText=currentRes.name; renderClientPlats(); }
+        
+        function openMenu(id) { currentRes = restaurants.find(x=>x.id===id); if(!currentRes) return goToHome(); showSection('view-menu-client'); document.getElementById('client-res-name').innerText=currentRes.name; renderClientPlats(); }
+        
         function renderClientPlats() {
             const l = document.getElementById('plats-list-client'); l.innerHTML = '';
-            if(currentRes.plats) currentRes.plats.forEach(p => {
+            if(currentRes && currentRes.plats) currentRes.plats.forEach(p => {
                 const q = cart[p.id]?.qte || 0;
                 l.innerHTML += `<div style="display:flex;align-items:center;gap:10px;background:#333;padding:10px;margin-bottom:10px;border-radius:10px"><img src="${p.img}" class="img-plat-client" onclick="this.classList.toggle('zoom-image')"><div style="flex:1"><b>${p.n}</b><br>${p.p} DZD</div><div style="display:flex;align-items:center;gap:10px"><button onclick="changeQty(${p.id},-1)">-</button><b>${q}</b><button onclick="changeQty(${p.id},1)">+</button></div></div>`;
             });
@@ -410,7 +421,8 @@
             pushData(); closeClientPin(); goToHome(); setNotif("COMMANDE RÉUSSIE");
         }
         
-        init();
+        // On initialise une première fois au chargement
+        generatePads();
     </script>
 </body>
 </html>
