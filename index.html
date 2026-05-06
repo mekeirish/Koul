@@ -19,9 +19,6 @@
         .spinner { width: 50px; height: 50px; border: 5px solid #333; border-top: 5px solid var(--primary); border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 20px; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-        .img-plat-client { width: 60px; height: 60px; border-radius: 5px; object-fit: cover; transition: all 0.3s ease; cursor: pointer; z-index: 1; }
-        .img-plat-client.zoom-image { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 90vw; height: auto; max-height: 80vh; border-radius: 15px; z-index: 5000; box-shadow: 0 0 100px rgba(0,0,0,0.9); outline: 5000px solid rgba(0,0,0,0.8); }
-
         #notification-bar { width: 100%; min-height: 55px; background-color: #000; display: flex; align-items: center; justify-content: center; position: sticky; top: 0; z-index: 4000; border-bottom: 3px solid var(--primary); color: var(--primary); font-weight: bold; text-align: center; padding: 5px 15px; box-sizing: border-box; box-shadow: 0 4px 15px rgba(0,0,0,0.5); font-size: 1rem; text-transform: uppercase; }
 
         header { padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; }
@@ -36,19 +33,22 @@
         .container { padding: 15px; }
         .grid-container { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; }
         .card { background-color: #3d3d3d; border-radius: 12px; padding: 10px; text-align: center; cursor: pointer; border: 1px solid #444; }
-        .card img { width: 100%; height: 80px; object-fit: cover; border-radius: 8px; margin-bottom: 5px; }
+        .card img { width: 100%; height: 100px; object-fit: cover; border-radius: 8px; margin-bottom: 5px; }
 
         .dashboard-box { background-color: rgba(30, 30, 30, 0.9); border-radius: 15px; padding: 20px; border: 1px solid var(--primary); }
         .btn-menu-pro { width: 100%; background-color: #444; color: white; border: 1px solid #555; padding: 15px; margin-top: 10px; border-radius: 8px; font-weight: bold; display: flex; justify-content: space-between; align-items: center; }
         .sub-section { display: none; margin-top: 5px; padding: 15px; background: #252525; border-radius: 8px; border-left: 3px solid var(--primary); }
+        .inner-form { display: none; background: #1a1a1a; padding: 15px; border-radius: 8px; margin-bottom: 15px; border: 1px dotted var(--primary); }
         .input-box { width: 100%; padding: 12px; margin-bottom: 10px; background:#333; color:white; border:1px solid #444; border-radius:5px; box-sizing: border-box; }
 
         .hist-card { background: #1a1a1a; border-radius: 8px; padding: 12px; margin-bottom: 10px; font-size: 0.8rem; border-left: 4px solid var(--primary); }
         .type-tag { font-size: 0.65rem; padding: 2px 5px; border-radius: 3px; background: #333; margin-bottom: 5px; display: inline-block; }
 
         .btn-icon { background: #333; border: 1px solid #555; color: white; padding: 5px 10px; border-radius: 5px; cursor: pointer; margin-left: 5px; }
-        .plat-manage-card { display: flex; align-items: center; gap: 10px; background: #333; padding: 10px; border-radius: 8px; margin-bottom: 8px; }
         .mini-img { width: 50px; height: 50px; border-radius: 5px; object-fit: cover; }
+        
+        .img-plat-client { width: 60px; height: 60px; border-radius: 5px; object-fit: cover; cursor: pointer; }
+        .img-plat-client.zoom-image { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 90vw; height: auto; max-height: 80vh; border-radius: 15px; z-index: 5000; box-shadow: 0 0 100px rgba(0,0,0,0.9); outline: 5000px solid rgba(0,0,0,0.8); }
 
         .order-card-pro { background: #333; padding: 15px; border-radius: 8px; margin-bottom: 10px; border: 1px solid #444; }
         .order-actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
@@ -64,10 +64,7 @@
 </head>
 <body>
 
-    <div id="loading-screen">
-        <div class="spinner"></div>
-        <h2 style="color:var(--primary); font-style:italic">KOUL</h2>
-    </div>
+    <div id="loading-screen"><div class="spinner"></div><h2 style="color:var(--primary); font-style:italic">KOUL</h2></div>
 
     <div id="notification-bar"><span id="notif-message">BIENVENUE</span></div>
 
@@ -81,7 +78,6 @@
     <div id="delivery-validation-container" class="numpad-container"><h3 style="color:var(--primary)">CODE CLIENT</h3><div class="pin-display" id="delivery-pin-view"></div><div class="numpad" id="numpad-delivery"></div><button onclick="closeDeliveryPin()" style="margin-top:15px; background:none; border:none; color:#888">ANNULER</button></div>
 
     <div id="view-restaurants" class="view-section active container"><div class="grid-container" id="res-grid"></div></div>
-
     <div id="view-menu-client" class="view-section container">
         <button onclick="goToHome()" style="border:1px solid var(--primary); background:none; color:var(--primary); padding:8px; border-radius:5px; margin-bottom:15px">← RETOUR</button>
         <h2 id="client-res-name"></h2><div id="plats-list-client"></div>
@@ -97,37 +93,49 @@
                 <button class="btn-pro-header" style="width:100%" onclick="updatePromoMessage()">METTRE À JOUR</button>
             </div>
 
-            <button class="btn-menu-pro" onclick="toggleSec('adm-res')">Restos <span>+</span></button>
+            <button class="btn-menu-pro" onclick="toggleSec('adm-res')">Restos <span>⚙</span></button>
             <div id="adm-res" class="sub-section">
-                <input type="text" id="adm-res-n" class="input-box" placeholder="Nom">
-                <input type="text" id="adm-res-c" class="input-box" placeholder="Code">
-                <input type="file" id="adm-res-img" class="input-box" accept="image/*">
-                <button class="btn-pro-header" style="width:100%" onclick="adminCreateRes()">AJOUTER</button>
-                <div id="list-res-to-manage" style="margin-top:10px"></div>
-            </div>
-
-            <button class="btn-menu-pro" onclick="toggleSec('adm-liv')">Livreurs <span>+</span></button>
-            <div id="adm-liv" class="sub-section">
-                <input type="text" id="adm-liv-n" class="input-box" placeholder="Nom">
-                <input type="text" id="adm-liv-c" class="input-box" placeholder="Code">
-                <input type="file" id="adm-liv-img" class="input-box" accept="image/*">
-                <button class="btn-pro-header" style="width:100%" onclick="adminCreateLiv()">AJOUTER</button>
-                <div id="list-liv-to-manage" style="margin-top:10px"></div>
-            </div>
-
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:20px">
-                <h3 style="margin:0">Journal Global</h3>
-                <div>
-                    <button class="btn-icon" onclick="exportHistory()" title="Exporter">💾 TXT</button>
-                    <button class="btn-icon" onclick="showClearConfirm()" title="Vider" style="color:#ff4444">🗑️</button>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px">
+                    <h4 style="margin:0">Liste des Restos</h4>
+                    <button onclick="toggleSec('form-res')" style="background:#007bff; color:white; border:none; border-radius:50%; width:30px; height:30px; font-weight:bold; cursor:pointer">+</button>
                 </div>
+                
+                <div id="form-res" class="inner-form">
+                    <input type="text" id="adm-res-n" class="input-box" placeholder="Nom du resto">
+                    <input type="text" id="adm-res-c" class="input-box" placeholder="Code secret">
+                    <input type="file" id="adm-res-img" class="input-box" accept="image/*">
+                    <button class="btn-pro-header" style="width:100%" onclick="adminCreateRes()">ENREGISTRER</button>
+                </div>
+
+                <div id="list-res-to-manage"></div>
             </div>
-            <div id="clear-confirm-panel" class="confirm-panel">
-                <p>Vider l'historique définitivement ?</p>
-                <button class="btn-finish" onclick="clearHistory()">OUI</button>
-                <button class="btn-reject" onclick="showClearConfirm(false)">NON</button>
+
+            <button class="btn-menu-pro" onclick="toggleSec('adm-liv')">Livreurs <span>⚙</span></button>
+            <div id="adm-liv" class="sub-section">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px">
+                    <h4 style="margin:0">Liste des Livreurs</h4>
+                    <button onclick="toggleSec('form-liv')" style="background:#007bff; color:white; border:none; border-radius:50%; width:30px; height:30px; font-weight:bold; cursor:pointer">+</button>
+                </div>
+
+                <div id="form-liv" class="inner-form">
+                    <input type="text" id="adm-liv-n" class="input-box" placeholder="Nom du livreur">
+                    <input type="text" id="adm-liv-c" class="input-box" placeholder="Code secret">
+                    <input type="file" id="adm-liv-img" class="input-box" accept="image/*">
+                    <button class="btn-pro-header" style="width:100%" onclick="adminCreateLiv()">ENREGISTRER</button>
+                </div>
+
+                <div id="list-liv-to-manage"></div>
             </div>
-            <div id="admin-hist-list" style="margin-top:10px"></div>
+
+            <button class="btn-menu-pro" onclick="toggleSec('adm-history-box')">Journal Global <span>📜</span></button>
+            <div id="adm-history-box" class="sub-section">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px">
+                    <h3 style="margin:0">Journal Global</h3>
+                    <div><button class="btn-icon" onclick="exportHistory()">💾 TXT</button><button class="btn-icon" onclick="showClearConfirm()" style="color:#ff4444">🗑️</button></div>
+                </div>
+                <div id="clear-confirm-panel" class="confirm-panel"><p>Vider l'historique ?</p><button class="btn-finish" onclick="clearHistory()">OUI</button><button class="btn-reject" onclick="showClearConfirm(false)">NON</button></div>
+                <div id="admin-hist-list" style="max-height: 400px; overflow-y: auto;"></div>
+            </div>
         </div>
     </div>
 
@@ -140,15 +148,13 @@
             <div id="add-plat" class="sub-section">
                 <input type="text" id="new-n" class="input-box" placeholder="Nom">
                 <input type="number" id="new-p" class="input-box" placeholder="Prix DZD">
-                <input type="number" id="new-s" class="input-box" placeholder="Stock initial">
+                <input type="number" id="new-s" class="input-box" placeholder="Stock">
                 <input type="file" id="new-img" class="input-box" accept="image/*">
                 <button class="btn-pro-header" style="width:100%" onclick="addNewPlat()">ENREGISTRER</button>
             </div>
             <button class="btn-menu-pro" onclick="toggleSec('manage-plats')">Stocks & Plats <span>⚙</span></button>
             <div id="manage-plats" class="sub-section"></div>
-            
-            <hr style="border:0; border-top:1px solid #444; margin:20px 0">
-            <h3>Historique Restaurant</h3>
+            <h3 style="margin-top:20px">Historique Restaurant</h3>
             <div id="res-event-log" style="max-height:300px; overflow-y:auto;"></div>
         </div>
     </div>
@@ -168,7 +174,6 @@
     </div>
 
     <script>
-        // --- CONFIG FIREBASE ---
         const firebaseConfig = {
             apiKey: "AIzaSyD4ekJLYuL5QTsroQj_QlOUPohDwhlQ14s",
             authDomain: "koul-ec357.firebaseapp.com",
@@ -181,110 +186,76 @@
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
 
-        let restaurants = [], livreurs = [], adminHistory = [], cart = {}, currentRes = null, currentLivreur = null, currentPin = "", clientTempPin = "", deliveryTempPin = "";
-        let pendingResId = null, pendingOrderId = null;
-        let promoMessage = "BIENVENUE";
+        let restaurants = [], livreurs = [], adminHistory = [], cart = {}, currentRes = null, currentLivreur = null, currentPin = "", clientTempPin = "", deliveryTempPin = "", pendingResId = null, pendingOrderId = null, promoMessage = "BIENVENUE";
 
-        // --- FONCTION DE COMPRESSION ---
-        function compressImage(file, callback) {
+        async function compressImage(file, callback) {
             if (!file) { callback(''); return; }
             const reader = new FileReader();
             reader.readAsDataURL(file);
-            reader.onload = function (event) {
+            reader.onload = async (e) => {
                 const img = new Image();
-                img.src = event.target.result;
-                img.onload = function () {
+                img.src = e.target.result;
+                try {
+                    await img.decode();
                     const canvas = document.createElement('canvas');
-                    const MAX_WIDTH = 800; // Largeur max pour mobile
-                    const scaleSize = MAX_WIDTH / img.width;
+                    const MAX_WIDTH = 800;
+                    const scale = MAX_WIDTH / img.width;
                     canvas.width = MAX_WIDTH;
-                    canvas.height = img.height * scaleSize;
-
-                    const ctx = canvas.getContext('2d');
-                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                    
-                    // On compresse à 70% de qualité en format JPEG pour gagner énormément de place
-                    const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
-                    callback(dataUrl);
-                };
+                    canvas.height = img.height * scale;
+                    const ctx = canvas.getContext('2d', { alpha: false });
+                    ctx.fillStyle = "#FFFFFF";
+                    ctx.fillRect(0,0,canvas.width,canvas.height);
+                    ctx.drawImage(img,0,0,canvas.width,canvas.height);
+                    callback(canvas.toDataURL('image/jpeg', 0.7));
+                } catch (err) { callback(e.target.result); }
             };
         }
 
-        function pushData() {
-            db.ref('cloud_koul').set({ 
-                restaurants: restaurants || [], 
-                livreurs: livreurs || [], 
-                adminHistory: adminHistory || [], 
-                promoMessage: promoMessage || "BIENVENUE"
-            });
-        }
+        function pushData() { db.ref('cloud_koul').set({ restaurants, livreurs, adminHistory, promoMessage }); }
 
-        db.ref('cloud_koul').on('value', (snapshot) => {
-            const data = snapshot.val();
+        db.ref('cloud_koul').on('value', (s) => {
+            const data = s.val();
             document.getElementById('loading-screen').style.display = 'none';
-
             if(data) {
-                restaurants = data.restaurants || [];
-                livreurs = data.livreurs || [];
-                adminHistory = data.adminHistory || [];
-                promoMessage = data.promoMessage || "BIENVENUE";
-                
+                restaurants = data.restaurants || []; livreurs = data.livreurs || []; adminHistory = data.adminHistory || []; promoMessage = data.promoMessage || "BIENVENUE";
                 document.getElementById('notif-message').innerText = promoMessage;
-
-                if(currentRes) {
-                    const updatedRes = restaurants.find(r => r.id === currentRes.id);
-                    if(updatedRes) currentRes = updatedRes;
-                }
-                if(currentLivreur) {
-                    const updatedLiv = livreurs.find(l => l.id === currentLivreur.id);
-                    if(updatedLiv) currentLivreur = updatedLiv;
-                }
-                
+                if(currentRes) currentRes = restaurants.find(r => r.id === currentRes.id);
+                if(currentLivreur) currentLivreur = livreurs.find(l => l.id === currentLivreur.id);
                 refreshCurrentView();
             }
-            if(document.getElementById('view-restaurants').classList.contains('active')) {
-                init();
-            }
+            if(document.getElementById('view-restaurants').classList.contains('active')) init();
         });
 
         function refreshCurrentView() {
-            if(document.getElementById('view-admin-space').classList.contains('active')) {
-                renderAdminResList(); renderAdminLivList(); renderAdminHistory();
-            }
-            if(document.getElementById('view-pro-space').classList.contains('active') && currentRes) {
-                renderProOrders(); renderProPlats(); renderResHistory();
-            }
-            if(document.getElementById('view-livreur-space').classList.contains('active') && currentLivreur) {
-                renderLivreurOrders(); renderLivreurHistory();
-            }
+            if(document.getElementById('view-admin-space').classList.contains('active')) { renderAdminResList(); renderAdminLivList(); renderAdminHistory(); }
+            if(document.getElementById('view-pro-space').classList.contains('active') && currentRes) { renderProOrders(); renderProPlats(); renderResHistory(); }
+            if(document.getElementById('view-livreur-space').classList.contains('active') && currentLivreur) { renderLivreurOrders(); renderLivreurHistory(); }
         }
 
         const vibrate = (ms = 50) => { if(navigator.vibrate) navigator.vibrate(ms); };
-
         function setNotif(msg) { 
-            vibrate(100);
-            const bar = document.getElementById('notification-bar');
-            document.getElementById('notif-message').innerText = msg;
+            vibrate(100); const bar = document.getElementById('notification-bar'); document.getElementById('notif-message').innerText = msg;
             bar.style.backgroundColor = "#ffcc00"; bar.style.color = "#000";
-            setTimeout(() => { 
-                bar.style.backgroundColor = "#000"; bar.style.color = "#ffcc00"; 
-                document.getElementById('notif-message').innerText = promoMessage;
-            }, 3000);
+            setTimeout(() => { bar.style.backgroundColor = "#000"; bar.style.color = "#ffcc00"; document.getElementById('notif-message').innerText = promoMessage; }, 3000);
         }
 
-        function updatePromoMessage() {
-            const newTxt = document.getElementById('adm-promo-txt').value;
-            if(newTxt) { promoMessage = newTxt; logAdminEvent("ADMIN", `Promo modifiée: ${newTxt}`); setNotif("MESSAGE PROMO MIS À JOUR"); pushData(); }
+        function toggleSec(id) { 
+            const s = document.getElementById(id); 
+            const isOpening = s.style.display !== 'block';
+            s.style.display = isOpening ? 'block' : 'none'; 
+            if(isOpening) {
+                if(id === 'adm-res') renderAdminResList();
+                if(id === 'adm-liv') renderAdminLivList();
+                if(id === 'adm-history-box') renderAdminHistory();
+                if(id === 'manage-plats') renderProPlats();
+            }
         }
 
         function generatePads() {
-            const pads = ['pad-main', 'numpad-client', 'numpad-delivery'];
-            pads.forEach(id => {
+            ['pad-main', 'numpad-client', 'numpad-delivery'].forEach(id => {
                 const el = document.getElementById(id); el.innerHTML = '';
                 for(let i=1; i<=9; i++) el.innerHTML += `<button class="num-btn" onclick="pressPad('${id}','${i}')">${i}</button>`;
-                el.innerHTML += `<button class="num-btn" style="color:red" onclick="pressPad('${id}','C')">C</button>`;
-                el.innerHTML += `<button class="num-btn" onclick="pressPad('${id}','0')">${0}</button>`;
-                el.innerHTML += `<button class="num-btn" style="color:green" onclick="submitPad('${id}')">OK</button>`;
+                el.innerHTML += `<button class="num-btn" style="color:red" onclick="pressPad('${id}','C')">C</button><button class="num-btn" onclick="pressPad('${id}','0')">0</button><button class="num-btn" style="color:green" onclick="submitPad('${id}')">OK</button>`;
             });
         }
 
@@ -295,266 +266,150 @@
             if(id === 'numpad-delivery') { if(v==='C') deliveryTempPin=""; else if(deliveryTempPin.length<4) deliveryTempPin+=v; document.getElementById('delivery-pin-view').innerText=deliveryTempPin; }
         }
 
-        function submitPad(id) {
-            if(id === 'pad-main') processLogin();
-            if(id === 'numpad-client') confirmClientOrder();
-            if(id === 'numpad-delivery') confirmDelivery();
-        }
-
-        function toggleLoginArea() { 
-            const a = document.getElementById('login-container'); a.style.display = a.style.display==='block'?'none':'block'; 
-            currentPin=""; document.getElementById('pin-view').innerText=""; 
-        }
-
+        function submitPad(id) { if(id==='pad-main') processLogin(); if(id==='numpad-client') confirmClientOrder(); if(id==='numpad-delivery') confirmDelivery(); }
+        function toggleLoginArea() { const a = document.getElementById('login-container'); a.style.display = a.style.display==='block'?'none':'block'; currentPin=""; document.getElementById('pin-view').innerText=""; }
+        
         function processLogin() {
             const pin = currentPin; toggleLoginArea();
-            if(pin === "1747") { showSection('view-admin-space'); renderAdminResList(); renderAdminLivList(); renderAdminHistory(); } 
+            if(pin === "1747") showSection('view-admin-space');
             else {
                 const r = restaurants.find(x => x.code === pin), l = livreurs.find(x => x.code === pin);
-                if(r) { currentRes = r; showSection('view-pro-space'); document.getElementById('pro-res-title').innerText = r.name; renderProOrders(); renderProPlats(); renderResHistory(); }
-                else if(l) { currentLivreur = l; showSection('view-livreur-space'); document.getElementById('liv-name').innerText = l.name; renderLivreurOrders(); renderLivreurHistory(); }
-                else { vibrate([50, 50, 50]); setNotif("CODE ERRONÉ"); }
+                if(r) { currentRes = r; showSection('view-pro-space'); document.getElementById('pro-res-title').innerText = r.name; }
+                else if(l) { currentLivreur = l; showSection('view-livreur-space'); document.getElementById('liv-name').innerText = l.name; }
+                else { setNotif("CODE ERRONÉ"); }
             }
         }
 
-        function showSection(id) { 
-            document.querySelectorAll('.view-section').forEach(s => s.classList.remove('active')); 
-            document.getElementById(id).classList.add('active'); 
-            document.getElementById('footer-cart').style.display = (id === 'view-menu-client' && Object.keys(cart).length > 0) ? 'block' : 'none';
-        }
+        function showSection(id) { document.querySelectorAll('.view-section').forEach(s => s.classList.remove('active')); document.getElementById(id).classList.add('active'); updateCartUI(); }
+        function goToHome() { cart = {}; currentRes = null; currentLivreur = null; showSection('view-restaurants'); }
 
-        function goToHome() { cart = {}; currentRes = null; currentLivreur = null; showSection('view-restaurants'); init(); }
-
-        // --- ADMIN ---
         function adminCreateRes() {
-            const n = document.getElementById('adm-res-n').value, c = document.getElementById('adm-res-c').value, f = document.getElementById('adm-res-img').files[0];
-            if(n && c) {
-                compressImage(f, (compressedData) => {
-                    restaurants.push({id:Date.now(), name:n, code:c, img:compressedData, plats:[], orders:[], eventHistory:[]}); 
-                    logAdminEvent("SYSTEM", `Resto créé: ${n}`); 
-                    renderAdminResList(); 
-                    setNotif("RESTO AJOUTÉ"); 
-                    pushData();
+            const n = document.getElementById('adm-res-n'), c = document.getElementById('adm-res-c'), f = document.getElementById('adm-res-img');
+            if(n.value && c.value) {
+                compressImage(f.files[0], (img) => {
+                    restaurants.push({id:Date.now(), name:n.value, code:c.value, img, plats:[], orders:[], eventHistory:[]});
+                    logAdminEvent("SYSTEM", `Resto créé: ${n.value}`); n.value=''; c.value=''; f.value=''; 
+                    document.getElementById('form-res').style.display = 'none'; 
+                    pushData(); setNotif("RESTO AJOUTÉ");
                 });
             }
         }
+
         function adminCreateLiv() {
-            const n = document.getElementById('adm-liv-n').value, c = document.getElementById('adm-liv-c').value, f = document.getElementById('adm-liv-img').files[0];
-            if(n && c) {
-                compressImage(f, (compressedData) => {
-                    livreurs.push({id:Date.now(), name:n, code:c, img:compressedData, history:[]}); 
-                    logAdminEvent("SYSTEM", `Livreur créé: ${n}`); 
-                    renderAdminLivList(); 
-                    setNotif("LIVREUR AJOUTÉ"); 
-                    pushData();
+            const n = document.getElementById('adm-liv-n'), c = document.getElementById('adm-liv-c'), f = document.getElementById('adm-liv-img');
+            if(n.value && c.value) {
+                compressImage(f.files[0], (img) => {
+                    livreurs.push({id:Date.now(), name:n.value, code:c.value, img, history:[]});
+                    logAdminEvent("SYSTEM", `Livreur créé: ${n.value}`); n.value=''; c.value=''; f.value=''; 
+                    document.getElementById('form-liv').style.display = 'none';
+                    pushData(); setNotif("LIVREUR AJOUTÉ");
                 });
             }
         }
-        function logAdminEvent(type, details) { 
-            const now = new Date();
-            adminHistory.unshift({ 
-                type, 
-                details, 
-                time: String(now.getHours()).padStart(2, '0') + ":" + String(now.getMinutes()).padStart(2, '0'), 
-                date: now.toLocaleDateString() 
-            }); 
-            pushData(); 
+
+        function renderAdminResList() {
+            const l = document.getElementById('list-res-to-manage'); l.innerHTML = '';
+            restaurants.forEach(r => l.innerHTML += `<div style="display:flex;justify-content:space-between;align-items:center;background:#333;padding:10px;margin-bottom:5px;border-radius:5px"><span><b>${r.name}</b> <small>(Code: ${r.code})</small></span><button onclick="deleteRes(${r.id})" style="color:#ff4444;border:none;background:none;font-weight:bold;padding:5px">X</button></div>`);
         }
-        function logResEvent(res, status, order) { 
-            if(!res.eventHistory) res.eventHistory = []; 
-            const now = new Date();
-            const timeStr = String(now.getHours()).padStart(2, '0') + ":" + String(now.getMinutes()).padStart(2, '0');
-            res.eventHistory.unshift({ 
-                status, 
-                client: order.client, 
-                items: order.itemsText || (order.items ? order.items.join(', ') : ''), 
-                time: timeStr, 
-                date: now.toLocaleDateString() 
-            }); 
-            logAdminEvent(res.name.toUpperCase(), `${status} - Client: ${order.client}`);
-        }
+        function deleteRes(id) { if(confirm("Supprimer ?")) { restaurants = restaurants.filter(x=>x.id!==id); pushData(); } }
         
-        function renderAdminResList() { 
-            const l = document.getElementById('list-res-to-manage'); l.innerHTML = ''; 
-            restaurants.forEach((r) => l.innerHTML += `<div style="display:flex;justify-content:space-between;background:#222;padding:5px;margin-bottom:2px"><span>${r.name} <b>(Code: ${r.code})</b></span><button onclick="deleteRes(${r.id})" style="color:red;border:none;background:none">X</button></div>`); 
+        function renderAdminLivList() {
+            const l = document.getElementById('list-liv-to-manage'); l.innerHTML = '';
+            livreurs.forEach(v => l.innerHTML += `<div style="display:flex;justify-content:space-between;align-items:center;background:#333;padding:10px;margin-bottom:5px;border-radius:5px"><span><b>${v.name}</b> <small>(Code: ${v.code})</small></span><button onclick="deleteLiv(${v.id})" style="color:#ff4444;border:none;background:none;font-weight:bold;padding:5px">X</button></div>`);
         }
-        function deleteRes(id) { 
-            const r = restaurants.find(x => x.id === id);
-            if(confirm("Supprimer ce restaurant ?")) { 
-                logAdminEvent("SYSTEM", `Resto supprimé: ${r.name}`);
-                restaurants = restaurants.filter(x => x.id !== id); 
-                pushData(); renderAdminResList(); 
-            } 
-        }
+        function deleteLiv(id) { if(confirm("Supprimer ?")) { livreurs = livreurs.filter(x=>x.id!==id); pushData(); } }
 
-        function renderAdminLivList() { 
-            const l = document.getElementById('list-liv-to-manage'); l.innerHTML = ''; 
-            livreurs.forEach((liv) => l.innerHTML += `<div style="display:flex;justify-content:space-between;background:#222;padding:5px;margin-bottom:2px"><span>${liv.name} <b>(Code: ${liv.code})</b></span><button onclick="deleteLiv(${liv.id})" style="color:red;border:none;background:none">X</button></div>`); 
-        }
-        function deleteLiv(id) { 
-            const l = livreurs.find(x => x.id === id);
-            if(confirm("Supprimer ce livreur ?")) { 
-                logAdminEvent("SYSTEM", `Livreur supprimé: ${l.name}`);
-                livreurs = livreurs.filter(x => x.id !== id); 
-                pushData(); renderAdminLivList(); 
-            } 
-        }
+        function logAdminEvent(type, details) { const now = new Date(); adminHistory.unshift({ type, details, time: now.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}), date: now.toLocaleDateString() }); pushData(); }
+        function renderAdminHistory() { const l = document.getElementById('admin-hist-list'); l.innerHTML = ''; adminHistory.forEach(h => l.innerHTML += `<div class="hist-card"><span class="type-tag">${h.type}</span><br><b>${h.details}</b><br><small>${h.date} ${h.time}</small></div>`); }
+        function clearHistory() { adminHistory = []; pushData(); showClearConfirm(false); }
+        function showClearConfirm(s=true) { document.getElementById('clear-confirm-panel').style.display=s?'block':'none'; }
 
-        function renderAdminHistory() { const l = document.getElementById('admin-hist-list'); l.innerHTML = ''; adminHistory.forEach(h => { l.innerHTML += `<div class="hist-card"><span class="type-tag">${h.type}</span><br><b>${h.details}</b><br><small>${h.date} ${h.time}</small></div>`; }); }
-        function clearHistory() { adminHistory = []; pushData(); showClearConfirm(false); setNotif("HISTORIQUE VIDÉ"); }
-
-        // --- PRO ---
         function addNewPlat() {
-            const nInput = document.getElementById('new-n'), pInput = document.getElementById('new-p'), sInput = document.getElementById('new-s'), imgInput = document.getElementById('new-img');
-            if(nInput.value && pInput.value) {
-                compressImage(imgInput.files[0], (compressedData) => {
-                    if(!currentRes.plats) currentRes.plats = []; 
-                    currentRes.plats.push({id:Date.now(), n:nInput.value, p:parseInt(pInput.value), stock:parseInt(sInput.value)||0, img:compressedData}); 
-                    logAdminEvent(currentRes.name, `Plat ajouté: ${nInput.value}`); 
-                    setNotif("PLAT AJOUTÉ (COMPRESSÉ)"); 
-                    renderProPlats(); 
-                    nInput.value = ""; pInput.value = ""; sInput.value = ""; imgInput.value = ""; 
-                    pushData();
+            const n = document.getElementById('new-n'), p = document.getElementById('new-p'), s = document.getElementById('new-s'), i = document.getElementById('new-img');
+            if(n.value && p.value) {
+                compressImage(i.files[0], (img) => {
+                    if(!currentRes.plats) currentRes.plats = [];
+                    currentRes.plats.push({id:Date.now(), n:n.value, p:parseInt(p.value), stock:parseInt(s.value)||0, img});
+                    n.value=''; p.value=''; s.value=''; i.value=''; document.getElementById('add-plat').style.display='none'; pushData(); setNotif("PLAT AJOUTÉ");
                 });
             }
         }
-        function renderProPlats() { const l = document.getElementById('manage-plats'); l.innerHTML = ''; if(currentRes.plats) currentRes.plats.forEach((p, i) => { l.innerHTML += `<div class="plat-manage-card"><img src="${p.img}" class="mini-img"><div style="flex:1"><b>${p.n}</b><br><small>${p.p} DZD</small></div><div style="display:flex; align-items:center"><input type="number" value="${p.stock}" id="stk-${i}" style="width:50px; background:#222; border:1px solid #555; color:white; padding:5px"><button class="btn-icon" onclick="updateStock(${i})">OK</button><button class="btn-icon" onclick="deletePlat(${p.id})" style="color:red">X</button></div></div>`; }); }
-        function deletePlat(id) { 
-            const p = currentRes.plats.find(x => x.id === id);
-            logAdminEvent(currentRes.name, `Plat supprimé: ${p.n}`);
-            currentRes.plats = currentRes.plats.filter(x => x.id !== id); 
-            pushData(); renderProPlats(); 
-        }
-        function updateStock(i) { 
-            const p = currentRes.plats[i];
-            const newStk = parseInt(document.getElementById(`stk-${i}`).value);
-            logAdminEvent(currentRes.name, `Stock ${p.n} : ${p.stock} -> ${newStk}`);
-            p.stock = newStk; setNotif("STOCK MIS À JOUR"); pushData(); 
-        }
-        
-        function renderProOrders() {
-            const l = document.getElementById('orders-list-pro'); l.innerHTML = '<h3>Commandes Actives</h3>';
-            if(currentRes.orders) currentRes.orders.forEach((o, i) => {
-                let statusColor = o.status === 'new' ? 'white' : (o.status === 'waiting' ? 'orange' : 'cyan');
-                let statusText = o.status === 'new' ? 'REÇUE' : (o.status === 'waiting' ? 'PUBLIÉE' : (o.livName ? `Prise par ${o.livName}` : 'EN COURS'));
-                l.innerHTML += `<div class="order-card-pro" style="border-left: 5px solid ${statusColor}"><div style="display:flex; justify-content:space-between"><b>${o.client}</b> <small>${statusText}</small></div><small>${o.itemsText}</small><br><b>${o.total} DZD</b><div class="order-actions"><a href="tel:${o.tel}" class="btn-call">APPELER</a>${o.status === 'new' ? `<button class="btn-finish" onclick="updateOrderStatus(${i}, 'waiting')">PUBLIER</button>` : ''}${o.status === 'new' ? `<button class="btn-reject" onclick="cancelOrder(${o.id})">ANNULER</button>` : ''}${o.status === 'waiting' || o.status === 'shipping' ? `<button class="btn-finish" style="background:#28a745" onclick="openValPin(${currentRes.id}, ${o.id})">CLÔTURER</button>` : ''}</div></div>`;
-            });
-        }
-        function updateOrderStatus(idx, status) { const o = currentRes.orders[idx]; o.status = status; logResEvent(currentRes, "COMMANDE PUBLIÉE", o); renderProOrders(); setNotif("COMMANDE PUBLIÉE"); pushData(); }
-        
-        function cancelOrder(oid) { 
-            const idx = currentRes.orders.findIndex(x => x.id === oid);
-            if(idx > -1) {
-                const o = currentRes.orders[idx];
-                o.rawItems.forEach(item => {
-                    const plat = currentRes.plats.find(p => p.id === item.id);
-                    if(plat) plat.stock += item.qte;
-                });
-                logResEvent(currentRes, "COMMANDE REJETÉE", o); 
-                currentRes.orders.splice(idx, 1);
-                renderProOrders(); setNotif("COMMANDE ANNULÉE (STOCK RENDU)"); pushData(); 
-            }
-        }
-        
-        function renderResHistory() { const l = document.getElementById('res-event-log'); if(!l) return; l.innerHTML = ''; if(!currentRes.eventHistory || currentRes.eventHistory.length === 0) { l.innerHTML = '<p style="color:#888; font-size:0.8rem">Aucun événement.</p>'; return; } currentRes.eventHistory.forEach(ev => { l.innerHTML += `<div class="hist-card" style="font-size:0.75rem;"><small>${ev.date} ${ev.time}</small><br><b>${ev.status}</b> - ${ev.client}</div>`; }); }
 
-        function hasActiveOrder(livId) {
-            let active = false;
-            restaurants.forEach(res => {
-                if(res.orders && res.orders.some(o => o.livId === livId && o.status === 'shipping')) active = true;
+        function renderProPlats() {
+            const l = document.getElementById('manage-plats'); l.innerHTML = '';
+            if(currentRes.plats) currentRes.plats.forEach((p, i) => {
+                l.innerHTML += `<div style="display:flex;align-items:center;gap:10px;background:#333;padding:10px;margin-bottom:5px;border-radius:8px"><img src="${p.img}" class="mini-img"><div style="flex:1"><b>${p.n}</b></div><input type="number" value="${p.stock}" id="stk-${i}" style="width:50px"><button onclick="updateStock(${i})">OK</button><button onclick="deletePlat(${p.id})" style="color:red">X</button></div>`;
             });
-            return active;
+        }
+        function updateStock(i) { currentRes.plats[i].stock = parseInt(document.getElementById(`stk-${i}`).value); pushData(); setNotif("STOCK MAJ"); }
+        function deletePlat(id) { currentRes.plats = currentRes.plats.filter(x=>x.id!==id); pushData(); }
+
+        function renderProOrders() {
+            const l = document.getElementById('orders-list-pro'); l.innerHTML = '<h3>Commandes</h3>';
+            if(currentRes.orders) currentRes.orders.forEach((o, i) => {
+                l.innerHTML += `<div class="order-card-pro"><b>${o.client}</b> (${o.status})<br><small>${o.itemsText}</small><br><b>${o.total} DZD</b><div class="order-actions"><a href="tel:${o.tel}" class="btn-call">APPELER</a>${o.status==='new'?`<button onclick="updateStatus(${i},'waiting')">PUBLIER</button>`:''}<button onclick="openValPin(${currentRes.id},${o.id})" style="background:green">LIVRÉ</button></div></div>`;
+            });
+        }
+        function updateStatus(i, s) { currentRes.orders[i].status = s; pushData(); }
+
+        function openValPin(rid, oid) { pendingResId=rid; pendingOrderId=oid; deliveryTempPin=""; document.getElementById('delivery-pin-view').innerText=""; document.getElementById('delivery-validation-container').style.display='block'; }
+        function closeDeliveryPin() { document.getElementById('delivery-validation-container').style.display='none'; }
+        function confirmDelivery() {
+            const r = restaurants.find(x=>x.id===pendingResId); const idx = r.orders.findIndex(x=>x.id===pendingOrderId);
+            if(deliveryTempPin === r.orders[idx].pin) {
+                const o = r.orders.splice(idx,1)[0];
+                if(currentLivreur) { if(!currentLivreur.history) currentLivreur.history=[]; currentLivreur.history.push({resName:r.name, date:new Date().toLocaleDateString()}); }
+                pushData(); closeDeliveryPin(); setNotif("TERMINÉ");
+            } else setNotif("CODE FAUX");
         }
 
         function renderLivreurOrders() {
             const l = document.getElementById('liv-orders'); l.innerHTML = '<h3>Missions</h3>';
-            const isBusy = hasActiveOrder(currentLivreur.id);
-            const myHiddenOrders = JSON.parse(localStorage.getItem(`koul_hidden_orders_${currentLivreur.id}`) || '[]');
-
-            restaurants.forEach(res => {
-                if(res.orders) res.orders.forEach(o => {
-                    if(!myHiddenOrders.includes(o.id) && (o.status === 'waiting' || (o.status === 'shipping' && o.livId === currentLivreur.id))) {
-                        const canTake = !isBusy && o.status === 'waiting';
-                        const isBeingShippedByMe = o.status === 'shipping' && o.livId === currentLivreur.id;
-
-                        l.innerHTML += `
-                            <div class="order-card-pro">
-                                <b style="color:var(--primary)">${res.name}</b><br>
-                                <b>Client: ${o.client}</b><br>
-                                <div class="order-actions">
-                                    ${canTake ? `<button class="btn-finish" onclick="takeOrd(${res.id}, ${o.id})">PRENDRE</button>` : ''}
-                                    ${o.status === 'waiting' ? `<button class="btn-reject" onclick="ignoreOrd(${o.id})">MASQUER</button>` : ''}
-                                    ${isBeingShippedByMe ? `<a href="tel:${o.tel}" class="btn-call">APPELER</a>` : ''}
-                                    ${isBeingShippedByMe ? `<button class="btn-finish" style="background:#28a745" onclick="openValPin(${res.id}, ${o.id})">VALIDER LIVRAISON</button>` : ''}
-                                </div>
-                            </div>`;
+            restaurants.forEach(r => {
+                if(r.orders) r.orders.forEach(o => {
+                    if(o.status === 'waiting' || (o.status==='shipping' && o.livId===currentLivreur.id)) {
+                        l.innerHTML += `<div class="order-card-pro"><b>${r.name}</b><br>Client: ${o.client}<br><div class="order-actions">${o.status==='waiting'?`<button onclick="takeOrd(${r.id},${o.id})">PRENDRE</button>`:`<button onclick="openValPin(${r.id},${o.id})">VALIDER</button>`}</div></div>`;
                     }
                 });
             });
         }
-
-        function takeOrd(rid, oid) {
-            if(hasActiveOrder(currentLivreur.id)) return setNotif("VOUS AVEZ DÉJÀ UNE LIVRAISON");
+        function takeOrd(rid, oid) { 
             const r = restaurants.find(x=>x.id===rid); const o = r.orders.find(x=>x.id===oid);
-            o.status = 'shipping'; o.livId = currentLivreur.id; o.livName = currentLivreur.name;
-            logResEvent(r, `PRISE PAR LIVREUR (${currentLivreur.name})`, o);
-            setNotif("COMMANDE RÉCUPÉRÉE"); renderLivreurOrders(); pushData();
+            o.status = 'shipping'; o.livId = currentLivreur.id; pushData(); 
         }
 
-        function ignoreOrd(oid) { 
-            const storageKey = `koul_hidden_orders_${currentLivreur.id}`;
-            let myHiddenOrders = JSON.parse(localStorage.getItem(storageKey) || '[]');
-            myHiddenOrders.push(oid); 
-            localStorage.setItem(storageKey, JSON.stringify(myHiddenOrders));
-            renderLivreurOrders(); 
-            setNotif("COMMANDE MASQUÉE"); 
+        function init() {
+            const g = document.getElementById('res-grid'); g.innerHTML = '';
+            restaurants.forEach(r => g.innerHTML += `<div class="card" onclick="openMenu(${r.id})"><img src="${r.img}"><b>${r.name}</b></div>`);
+            generatePads();
         }
-
-        function openValPin(rid, oid) { pendingResId = rid; pendingOrderId = oid; deliveryTempPin = ""; document.getElementById('delivery-pin-view').innerText = ""; document.getElementById('delivery-validation-container').style.display = 'block'; }
-        function closeDeliveryPin() { document.getElementById('delivery-validation-container').style.display = 'none'; }
-        
-        function confirmDelivery() {
-            const r = restaurants.find(x=>x.id===pendingResId); const idx = r.orders.findIndex(x=>x.id===pendingOrderId); const o = r.orders[idx];
-            if(deliveryTempPin === o.pin) {
-                const final = r.orders.splice(idx, 1)[0];
-                logResEvent(r, `LIVRÉE PAR ${currentLivreur ? currentLivreur.name : 'PRO'}`, final);
-                if(currentLivreur) { 
-                    if(!currentLivreur.history) currentLivreur.history = []; 
-                    const now = new Date();
-                    currentLivreur.history.push({ resName: r.name, date: now.toLocaleDateString(), time: String(now.getHours()).padStart(2, '0') + ":" + String(now.getMinutes()).padStart(2, '0') }); 
-                }
-                setNotif("LIVRÉ !"); pushData(); closeDeliveryPin(); if(currentLivreur) { renderLivreurOrders(); renderLivreurHistory(); } if(currentRes) { renderProOrders(); renderResHistory(); }
-            } else { vibrate([50, 50]); setNotif("CODE INCORRECT"); }
-        }
-
-        function renderLivreurHistory() { 
-            const l = document.getElementById('liv-hist'); l.innerHTML = '<h4>Historique</h4>'; 
-            if(currentLivreur.history) {
-                [...currentLivreur.history].reverse().forEach(h => {
-                    l.innerHTML += `<div style="font-size:0.75rem; background:#1a1a1a; padding:8px; margin-bottom:5px; border-left: 3px solid #28a745;"><b>${h.resName}</b><br><small>${h.date} - ${h.time}</small> ✅</div>`;
-                });
-            }
-        }
-
-        function init() { const grid = document.getElementById('res-grid'); grid.innerHTML = ''; restaurants.forEach(res => { grid.innerHTML += `<div class="card" onclick="openClientMenu(${res.id})"><img src="${res.img || 'https://via.placeholder.com/150'}"><br><b>${res.name}</b></div>`; }); generatePads(); }
-        function openClientMenu(rid) { currentRes = restaurants.find(x=>x.id===rid); showSection('view-menu-client'); document.getElementById('client-res-name').innerText = currentRes.name; renderClientPlats(); }
-        function toggleZoom(img) { img.classList.toggle('zoom-image'); }
-        function renderClientPlats() { const l = document.getElementById('plats-list-client'); l.innerHTML = ''; if(currentRes.plats) currentRes.plats.forEach(p => { const qty = cart[p.id] ? cart[p.id].qte : 0; l.innerHTML += `<div style="display:flex; align-items:center; gap:10px; background:#333; padding:10px; border-radius:10px; margin-bottom:10px"><img src="${p.img}" class="img-plat-client" onclick="toggleZoom(this)"><div style="flex:1"><b>${p.n}</b><br>${p.p} DZD <br><small>Dispo: ${p.stock}</small></div><div style="display:flex; align-items:center; gap:10px"><button onclick="changeQty(${p.id}, -1)">-</button><span>${qty}</span><button onclick="changeQty(${p.id}, 1)">+</button></div></div>`; }); }
-        function changeQty(pid, d) { const p = currentRes.plats.find(x=>x.id===pid); if(d > 0 && p.stock <= (cart[pid]?.qte || 0)) return setNotif("STOCK ÉPUISÉ"); if(!cart[pid]) cart[pid] = { n:p.n, p:p.p, qte:0, id: p.id }; cart[pid].qte += d; if(cart[pid].qte <= 0) delete cart[pid]; renderClientPlats(); updateCartUI(); }
-        function updateCartUI() { const f = document.getElementById('footer-cart'), l = document.getElementById('cart-items-list'); if(!Object.keys(cart).length || !document.getElementById('view-menu-client').classList.contains('active')) { f.style.display='none'; return; } f.style.display='block'; l.innerHTML = ''; let t = 0; Object.keys(cart).forEach(k => { t += cart[k].p * cart[k].qte; l.innerHTML += `<div>${cart[k].qte}x ${cart[k].n}</div>`; }); document.getElementById('cart-total').innerText = t; }
-        function openClientPin() { if(!document.getElementById('c-name').value) return setNotif("NOM REQUIS"); document.getElementById('client-pin-container').style.display='block'; clientTempPin=""; document.getElementById('client-pin-view').innerText=""; }
-        function closeClientPin() { document.getElementById('client-pin-container').style.display='none'; }
-        function confirmClientOrder() { if(clientTempPin.length<4) return; const itemsList = Object.values(cart); if(!currentRes.orders) currentRes.orders = []; itemsList.forEach(item => { const plat = currentRes.plats.find(p => p.id === item.id); if(plat) plat.stock -= item.qte; }); const order = { id: Date.now(), client: document.getElementById('c-name').value, tel: document.getElementById('c-tel').value, rawItems: itemsList, itemsText: itemsList.map(i => `${i.qte}x ${i.n}`).join(', '), total: document.getElementById('cart-total').innerText, pin: clientTempPin, status: 'new' }; currentRes.orders.push(order); logResEvent(currentRes, "NOUVELLE COMMANDE", order); setNotif("COMMANDE RÉUSIE"); closeClientPin(); pushData(); goToHome(); }
-        function showClearConfirm(show = true) { document.getElementById('clear-confirm-panel').style.display = show ? 'block' : 'none'; }
-        function toggleSec(id) { const s = document.getElementById(id); s.style.display = s.style.display==='block'?'none':'block'; }
-        function logoutLivreur() { currentLivreur = null; goToHome(); }
-        function exportHistory() { let content = "HISTORIQUE KOUL\n\n"; adminHistory.forEach(h => { content += `[${h.date} ${h.time}] ${h.type}: ${h.details}\n`; }); const blob = new Blob([content], { type: 'text/plain' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `log_koul.txt`; a.click(); }
-        
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('sw.js');
+        function openMenu(id) { currentRes = restaurants.find(x=>x.id===id); showSection('view-menu-client'); document.getElementById('client-res-name').innerText=currentRes.name; renderClientPlats(); }
+        function renderClientPlats() {
+            const l = document.getElementById('plats-list-client'); l.innerHTML = '';
+            if(currentRes.plats) currentRes.plats.forEach(p => {
+                const q = cart[p.id]?.qte || 0;
+                l.innerHTML += `<div style="display:flex;align-items:center;gap:10px;background:#333;padding:10px;margin-bottom:10px;border-radius:10px"><img src="${p.img}" class="img-plat-client" onclick="this.classList.toggle('zoom-image')"><div style="flex:1"><b>${p.n}</b><br>${p.p} DZD</div><div style="display:flex;align-items:center;gap:10px"><button onclick="changeQty(${p.id},-1)">-</button><b>${q}</b><button onclick="changeQty(${p.id},1)">+</button></div></div>`;
             });
         }
+        function changeQty(id, d) {
+            const p = currentRes.plats.find(x=>x.id===id);
+            if(!cart[id]) cart[id] = {n:p.n, p:p.p, qte:0, id:p.id};
+            cart[id].qte += d; if(cart[id].qte<=0) delete cart[id];
+            renderClientPlats(); updateCartUI();
+        }
+        function updateCartUI() {
+            const f = document.getElementById('footer-cart'); if(!Object.keys(cart).length || !document.getElementById('view-menu-client').classList.contains('active')) { f.style.display='none'; return; }
+            f.style.display='block'; let t=0; Object.values(cart).forEach(v => t+= v.p*v.qte); document.getElementById('cart-total').innerText=t;
+        }
+        function openClientPin() { if(document.getElementById('c-name').value) document.getElementById('client-pin-container').style.display='block'; else setNotif("NOM REQUIS"); }
+        function closeClientPin() { document.getElementById('client-pin-container').style.display='none'; }
+        function confirmClientOrder() {
+            const items = Object.values(cart);
+            currentRes.orders.push({id:Date.now(), client:document.getElementById('c-name').value, tel:document.getElementById('c-tel').value, itemsText:items.map(i=>`${i.qte}x ${i.n}`).join(', '), total:document.getElementById('cart-total').innerText, pin:clientTempPin, status:'new'});
+            items.forEach(i => { const p = currentRes.plats.find(x=>x.id===i.id); if(p) p.stock-=i.qte; });
+            pushData(); closeClientPin(); goToHome(); setNotif("COMMANDE RÉUSSIE");
+        }
+        
         init();
     </script>
 </body>
