@@ -167,6 +167,407 @@
     <div id="footer-cart">
         <div id="cart-items-list" style="max-height:80px; overflow:auto; padding:10px; font-size:0.8rem"></div>
         <div style="padding:0 10px"><input type="text" id="c-name" class="input-box" placeholder="Nom"><input type="tel" id="c-tel" class="input-box" placeholder="Tél"></div>
+        <div style="padding:10px; display:flex; justify-content:space-between; align-items:center">
+            <b>Total: <span id="cart-total">0</span> DZD</b>
+            <button class="btn-finish" style="flex:none; padding:10px 20px" onclick="openClientPin()">COMMANDER</button>
+        </div>
+    </div>
+
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyD4ekJLYuL5QTsroQj_QlOUPohDwhlQ14s",
+            authDomain: "koul-ec357.firebaseapp.com",
+            databaseURL: "https://koul-ec357-default-rtdb.europe-west1.firebasedatabase.app",
+            projectId: "koul-ec357",
+            storageBucket: "koul-ec357.firebasestorage.app",
+            messagingSenderId: "461125460557",
+            appId: "1:461125460557:web:31b3f4366ec233bf9b3204"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+
+        let restaurants = [], livreurs = [], adminHistory = [], cart = {}, currentRes = null, currentLivreur = null, currentPin = "", clientTempPin = "", deliveryTempPin = "", pendingResId = null, pendingOrderId = null, promoMessage = "BIENVENUE";
+
+        async function compressImage(file, callback) {
+            if (!file) { callback(''); return; }
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = async (e) => {
+                const img = new Image();
+                img.src = e.target.result;
+                try {
+                    await img.decode();
+                    const canvas = document.createElement('canvas');
+                    const MAX_WIDTH = 800;
+                    const scale = MAX_WIDTH / img.width;
+                    canvas.width = MAX_WIDTH;
+                    canvas.height = img.height * scale;
+                    const ctx = canvas.getContext('2d', { alpha: false });
+                    ctx.fillStyle = "#FFFFFF";
+                    ctx.fillRect(0,0,canvas.width,canvas.height);
+                    ctx.drawImage(img,0,0,canvas.width,canvas.height);
+                    callback(canvas.toDataURL('image/jpeg', 0.7));
+                } catch (err) { callback(e.target.result); }
+            };
+        }
+
+        function pushData() { db.ref('cloud_koul').set({ restaurants, livreurs, adminHistory, promoMessage }); }
+
+        db.ref('cloud_koul').on('value', (s) => {
+            const data = s.val();
+            document.getElementById('loading-screen').style.display = 'none';
+            if(data) {
+                restaurants = data.restaurants || []; 
+                livreurs = data.livreurs || []; 
+                adminHistory = data.adminHistory || []; 
+                promoMessage = data.promoMessage || "BIENVENUE";
+                document.getElementById('notif-message').innerText = promoMessage;
+                if(currentRes) currentRes = restaurants.find(r => r.id === currentRes.id);
+                if(currentLivreur) currentLivreur = livreurs.find(l => l.id === currentLivreur.id);
+                
+                // On reconstruit la grille client à chaque changement de données
+                init();
+                refreshCurrentView();
+            }
+        });
+
+        function refreshCurrentView() {
+            if(document.getElementById('view-admin-space').classList.contains('active')) { renderAdminResList(); renderAdminLivList(); renderAdminHistory(); }
+            if(document.getElementById('view-pro-space').classList.contains('active') && currentRes) { renderProOrders(); renderProPlats(); }
+            if(document.getElementById('view-livreur-space').classList.contains('active') && currentLivreur) { renderLivreurOrders(); }
+        }
+
+        const vibrate = (ms = 50) => { if(navigator.vibrate) navigator.vibrate(ms); };
+        function setNotif(msg) { 
+            vibrate(100); const bar = document.getElementById('notification-bar'); document.getElementById('notif-message').innerText = msg;
+            bar.style.backgroundColor = "#ffcc00"; bar.style.color = "#000";
+            setTimeout(() => { bar.style.backgroundColor = "#000"; bar.style.color = "#ffcc00"; document.getElementById('notif-message').innerText = promoMessage; }, 3000);
+        }
+
+        function toggleSec(id) { 
+            const s = document.getElementById(id); 
+            const isOpening = s.style.display !== 'block';
+            s.style.display = isOpening ? 'block' : 'none'; 
+            if(isOpening) {
+                if(id === 'adm-res') renderAdminResList();
+                if(id === 'adm-liv') renderAdminLivList();
+                if(id === 'adm-history-box') renderAdminHistory();
+                if(id === 'manage-plats') renderProPlats();
+            }
+        }
+
+        function generatePads() {
+            ['pad-main', 'numpad-client', 'numpad-delivery'].forEach(id => {
+                const el = document.getElementById(id); el.innerHTML = '';
+                for(let i=1; i<=9; i++) el.innerHTML += `<button class="num-btn" onclick="pressPad('${id}','${i}')">${i}</button>`;
+                el.innerHTML += `<button class="num-btn" style="color:red" onclick="pressPad('${id}','C')">C</button><button class="num-btn" onclick="pressPad('${id}','0')">0</button><button class="num-btn" style="color:green" onclick="submitPad('${id}')">OK</button>`;
+            });
+        }
+
+        function pressPad(id, v) {
+            vibrate(30);
+            if(id === 'pad-main') { if(v==='C') currentPin=""; else if(currentPin.length<4) currentPin+=v; document.getElementById('pin-view').innerText=currentPin.replace(/./g,'*'); }
+            if(id === 'numpad-client') { if(v==='C') clientTempPin=""; else if(clientTempPin.length<4) clientTempPin+=v; document.getElementById('client-pin-view').innerText=clientTempPin; }
+            if(id === 'numpad-delivery') { if(v==='C') deliveryTempPin=""; else if(deliveryTempPin.length<4) deliveryTempPin+=v; document.getElementById('delivery-pin-view').innerText=deliveryTempPin; }
+        }
+
+        function submitPad(id) { if(id==='pad-main') processLogin(); if(id==='numpad-client') confirmClientOrder(); if(id==='numpad-delivery') confirmDelivery(); }
+        function toggleLoginArea() { const a = document.getElementById('login-container'); a.style.display = a.style.display==='block'?'none':'block'; currentPin=""; document.getElementById('pin-view').innerText=""; }
+        
+        function processLogin() {
+            const pin = currentPin; toggleLoginArea();
+            if(pin === "1747") showSection('view-admin-space');
+            else {
+                const r = restaurants.find(x => x.code === pin), l = livreurs.find(x => x.code === pin);
+                if(r) { currentRes = r; showSection('view-pro-space'); document.getElementById('pro-res-title').innerText = r.name; }
+                else if(l) { currentLivreur = l; showSection('view-livreur-space'); document.getElementById('liv-name').innerText = l.name; }
+                else { setNotif("CODE ERRONÉ"); }
+            }
+        }
+
+        function showSection(id) { document.querySelectorAll('.view-section').forEach(s => s.classList.remove('active')); document.getElementById(id).classList.add('active'); updateCartUI(); }
+        function goToHome() { cart = {}; currentRes = null; currentLivreur = null; showSection('view-restaurants'); }
+
+        function adminCreateRes() {
+            const n = document.getElementById('adm-res-n'), c = document.getElementById('adm-res-c'), f = document.getElementById('adm-res-img');
+            if(n.value && c.value) {
+                compressImage(f.files[0], (img) => {
+                    restaurants.push({id:Date.now(), name:n.value, code:c.value, img, plats:[], orders:[], eventHistory:[]});
+                    logAdminEvent("SYSTEM", `Resto créé: ${n.value}`); n.value=''; c.value=''; f.value=''; 
+                    document.getElementById('form-res').style.display = 'none'; 
+                    pushData(); setNotif("RESTO AJOUTÉ");
+                });
+            }
+        }
+
+        function adminCreateLiv() {
+            const n = document.getElementById('adm-liv-n'), c = document.getElementById('adm-liv-c'), f = document.getElementById('adm-liv-img');
+            if(n.value && c.value) {
+                compressImage(f.files[0], (img) => {
+                    livreurs.push({id:Date.now(), name:n.value, code:c.value, img, history:[]});
+                    logAdminEvent("SYSTEM", `Livreur créé: ${n.value}`); n.value=''; c.value=''; f.value=''; 
+                    document.getElementById('form-liv').style.display = 'none';
+                    pushData(); setNotif("LIVREUR AJOUTÉ");
+                });
+            }
+        }
+
+        function renderAdminResList() {
+            const l = document.getElementById('list-res-to-manage'); l.innerHTML = '';
+            restaurants.forEach(r => l.innerHTML += `<div style="display:flex;justify-content:space-between;align-items:center;background:#333;padding:10px;margin-bottom:5px;border-radius:5px"><span><b>${r.name}</b> <small>(Code: ${r.code})</small></span><button onclick="deleteRes(${r.id})" style="color:#ff4444;border:none;background:none;font-weight:bold;padding:5px">X</button></div>`);
+        }
+        
+        function deleteRes(id) { 
+            if(confirm("Supprimer ce resto ?")) {
+                restaurants = restaurants.filter(x => x.id !== id);
+                pushData();
+                setNotif("RESTO SUPPRIMÉ");
+            }
+        }
+        
+        function renderAdminLivList() {
+            const l = document.getElementById('list-liv-to-manage'); l.innerHTML = '';
+            livreurs.forEach(v => l.innerHTML += `<div style="display:flex;justify-content:space-between;align-items:center;background:#333;padding:10px;margin-bottom:5px;border-radius:5px"><span><b>${v.name}</b> <small>(Code: ${v.code})</small></span><button onclick="deleteLiv(${v.id})" style="color:#ff4444;border:none;background:none;font-weight:bold;padding:5px">X</button></div>`);
+        }
+        
+        function deleteLiv(id) { 
+            if(confirm("Supprimer ce livreur ?")) {
+                livreurs = livreurs.filter(x => x.id !== id);
+                pushData();
+                setNotif("LIVREUR SUPPRIMÉ");
+            }
+        }
+
+        function logAdminEvent(type, details) { const now = new Date(); adminHistory.unshift({ type, details, time: now.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}), date: now.toLocaleDateString() }); pushData(); }
+        function renderAdminHistory() { const l = document.getElementById('admin-hist-list'); l.innerHTML = ''; adminHistory.forEach(h => l.innerHTML += `<div class="hist-card"><span class="type-tag">${h.type}</span><br><b>${h.details}</b><br><small>${h.date} ${h.time}</small></div>`); }
+        function clearHistory() { adminHistory = []; pushData(); showClearConfirm(false); }
+        function showClearConfirm(s=true) { document.getElementById('clear-confirm-panel').style.display=s?'block':'none'; }
+
+        function addNewPlat() {
+            const n = document.getElementById('new-n'), p = document.getElementById('new-p'), s = document.getElementById('new-s'), i = document.getElementById('new-img');
+            if(n.value && p.value) {
+                compressImage(i.files[0], (img) => {
+                    if(!currentRes.plats) currentRes.plats = [];
+                    currentRes.plats.push({id:Date.now(), n:n.value, p:parseInt(p.value), stock:parseInt(s.value)||0, img});
+                    n.value=''; p.value=''; s.value=''; i.value=''; document.getElementById('add-plat').style.display='none'; pushData(); setNotif("PLAT AJOUTÉ");
+                });
+            }
+        }
+
+        function renderProPlats() {
+            const l = document.getElementById('manage-plats'); l.innerHTML = '';
+            if(currentRes.plats) currentRes.plats.forEach((p, i) => {
+                l.innerHTML += `<div style="display:flex;align-items:center;gap:10px;background:#333;padding:10px;margin-bottom:5px;border-radius:8px"><img src="${p.img}" class="mini-img"><div style="flex:1"><b>${p.n}</b></div><input type="number" value="${p.stock}" id="stk-${i}" style="width:50px"><button onclick="updateStock(${i})">OK</button><button onclick="deletePlat(${p.id})" style="color:red">X</button></div>`;
+            });
+        }
+        function updateStock(i) { currentRes.plats[i].stock = parseInt(document.getElementById(`stk-${i}`).value); pushData(); setNotif("STOCK MAJ"); }
+        function deletePlat(id) { currentRes.plats = currentRes.plats.filter(x=>x.id!==id); pushData(); }
+
+        function renderProOrders() {
+            const l = document.getElementById('orders-list-pro'); l.innerHTML = '<h3>Commandes</h3>';
+            if(currentRes.orders) currentRes.orders.forEach((o, i) => {
+                l.innerHTML += `<div class="order-card-pro"><b>${o.client}</b> (${o.status})<br><small>${o.itemsText}</small><br><b>${o.total} DZD</b><div class="order-actions"><a href="tel:${o.tel}" class="btn-call">APPELER</a>${o.status==='new'?`<button onclick="updateStatus(${i},'waiting')">PUBLIER</button>`:''}<button onclick="openValPin(${currentRes.id},${o.id})" style="background:green">LIVRÉ</button></div></div>`;
+            });
+        }
+        function updateStatus(i, s) { currentRes.orders[i].status = s; pushData(); }
+
+        function openValPin(rid, oid) { pendingResId=rid; pendingOrderId=oid; deliveryTempPin=""; document.getElementById('delivery-pin-view').innerText=""; document.getElementById('delivery-validation-container').style.display='block'; }
+        function closeDeliveryPin() { document.getElementById('delivery-validation-container').style.display='none'; }
+        function confirmDelivery() {
+            const r = restaurants.find(x=>x.id===pendingResId); const idx = r.orders.findIndex(x=>x.id===pendingOrderId);
+            if(deliveryTempPin === r.orders[idx].pin) {
+                const o = r.orders.splice(idx,1)[0];
+                if(currentLivreur) { if(!currentLivreur.history) currentLivreur.history=[]; currentLivreur.history.push({resName:r.name, date:new Date().toLocaleDateString()}); }
+                pushData(); closeDeliveryPin(); setNotif("TERMINÉ");
+            } else setNotif("CODE FAUX");
+        }
+
+        function renderLivreurOrders() {
+            const l = document.getElementById('liv-orders'); l.innerHTML = '<h3>Missions</h3>';
+            restaurants.forEach(r => {
+                if(r.orders) r.orders.forEach(o => {
+                    if(o.status === 'waiting' || (o.status==='shipping' && o.livId===currentLivreur.id)) {
+                        l.innerHTML += `<div class="order-card-pro"><b>${r.name}</b><br>Client: ${o.client}<br><div class="order-actions">${o.status==='waiting'?`<button onclick="takeOrd(${r.id},${o.id})">PRENDRE</button>`:`<button onclick="openValPin(${r.id},${o.id})">VALIDER</button>`}</div></div>`;
+                    }
+                });
+            });
+        }
+        function takeOrd(rid, oid) { 
+            const r = restaurants.find(x=>x.id===rid); const o = r.orders.find(x=>x.id===oid);
+            o.status = 'shipping'; o.livId = currentLivreur.id; pushData(); 
+        }
+
+        function init() {
+            const g = document.getElementById('res-grid'); 
+            if(!g) return;
+            g.innerHTML = '';
+            restaurants.forEach(r => g.innerHTML += `<div class="card" onclick="openMenu(${r.id})"><img src="${r.img}"><b>${r.name}</b></div>`);
+            generatePads();
+        }
+        function openMenu(id) { currentRes = restaurants.find(x=>x.id===id); showSection('view-menu-client'); document.getElementById('client-res-name').innerText=currentRes.name; renderClientPlats(); }
+        function renderClientPlats() {
+            const l = document.getElementById('plats-list-client'); l.innerHTML = '';
+            if(currentRes.plats) currentRes.plats.forEach(p => {
+                const q = cart[p.id]?.qte || 0;
+                l.innerHTML += `<div style="display:flex;align-items:center;gap:10px;background:#333;padding:10px;margin-bottom:10px;border-radius:10px"><img src="${p.img}" class="img-plat-client" onclick="this.classList.toggle('zoom-image')"><div style="flex:1"><b>${p.n}</b><br>${p.p} DZD</div><div style="display:flex;align-items:center;gap:10px"><button onclick="changeQty(${p.id},-1)">-</button><b>${q}</b><button onclick="changeQty(${p.id},1)">+</button></div></div>`;
+            });
+        }
+        function changeQty(id, d) {
+            const p = currentRes.plats.find(x=>x.id===id);
+            if(!cart[id]) cart[id] = {n:p.n, p:p.p, qte:0, id:p.id};
+            cart[id].qte += d; if(cart[id].qte<=0) delete cart[id];
+            renderClientPlats(); updateCartUI();
+        }
+        function updateCartUI() {
+            const f = document.getElementById('footer-cart'); if(!Object.keys(cart).length || !document.getElementById('view-menu-client').classList.contains('active')) { f.style.display='none'; return; }
+            f.style.display='block'; let t=0; Object.values(cart).forEach(v => t+= v.p*v.qte); document.getElementById('cart-total').innerText=t;
+        }
+        function openClientPin() { if(document.getElementById('c-name').value) document.getElementById('client-pin-container').style.display='block'; else setNotif("NOM REQUIS"); }
+        function closeClientPin() { document.getElementById('client-pin-container').style.display='none'; }
+        function confirmClientOrder() {
+            const items = Object.values(cart);
+            currentRes.orders.push({id:Date.now(), client:document.getElementById('c-name').value, tel:document.getElementById('c-tel').value, itemsText:items.map(i=>`${i.qte}x ${i.n}`).join(', '), total:document.getElementById('cart-total').innerText, pin:clientTempPin, status:'new'});
+            items.forEach(i => { const p = currentRes.plats.find(x=>x.id===i.id); if(p) p.stock-=i.qte; });
+            pushData(); closeClientPin(); goToHome(); setNotif("COMMANDE RÉUSSIE");
+        }
+        
+    </script>
+</body>
+</html>
+
+
+        .dashboard-box { background-color: rgba(30, 30, 30, 0.9); border-radius: 15px; padding: 20px; border: 1px solid var(--primary); }
+        .btn-menu-pro { width: 100%; background-color: #444; color: white; border: 1px solid #555; padding: 15px; margin-top: 10px; border-radius: 8px; font-weight: bold; display: flex; justify-content: space-between; align-items: center; }
+        .sub-section { display: none; margin-top: 5px; padding: 15px; background: #252525; border-radius: 8px; border-left: 3px solid var(--primary); }
+        .inner-form { display: none; background: #1a1a1a; padding: 15px; border-radius: 8px; margin-bottom: 15px; border: 1px dotted var(--primary); }
+        .input-box { width: 100%; padding: 12px; margin-bottom: 10px; background:#333; color:white; border:1px solid #444; border-radius:5px; box-sizing: border-box; }
+
+        .hist-card { background: #1a1a1a; border-radius: 8px; padding: 12px; margin-bottom: 10px; font-size: 0.8rem; border-left: 4px solid var(--primary); }
+        .type-tag { font-size: 0.65rem; padding: 2px 5px; border-radius: 3px; background: #333; margin-bottom: 5px; display: inline-block; }
+
+        .btn-icon { background: #333; border: 1px solid #555; color: white; padding: 5px 10px; border-radius: 5px; cursor: pointer; margin-left: 5px; }
+        .mini-img { width: 50px; height: 50px; border-radius: 5px; object-fit: cover; }
+        
+        .img-plat-client { width: 60px; height: 60px; border-radius: 5px; object-fit: cover; cursor: pointer; }
+        .img-plat-client.zoom-image { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 90vw; height: auto; max-height: 80vh; border-radius: 15px; z-index: 5000; box-shadow: 0 0 100px rgba(0,0,0,0.9); outline: 5000px solid rgba(0,0,0,0.8); }
+
+        .order-card-pro { background: #333; padding: 15px; border-radius: 8px; margin-bottom: 10px; border: 1px solid #444; }
+        .order-actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+        .btn-finish { background: #28a745; color: white; border: none; padding: 10px; border-radius: 5px; flex: 1; font-weight: bold; cursor: pointer; }
+        .btn-reject { background: #cc0000; color: white; border: none; padding: 10px; border-radius: 5px; flex: 1; font-weight: bold; cursor: pointer; }
+        .btn-call { background: #007bff; color: white; border: none; padding: 10px; border-radius: 5px; flex: 1; font-weight: bold; cursor: pointer; text-decoration: none; text-align: center; }
+        
+        #footer-cart { position: fixed; bottom: 0; left: 0; width: 100%; background: #1a1a1a; border-top: 2px solid var(--primary); z-index: 2000; display: none; }
+        .view-section { display: none; }
+        .active { display: block; }
+        .confirm-panel { background: #4d0000; padding: 10px; border-radius: 5px; margin-top: 10px; display: none; text-align: center; border: 1px solid #ff4444; }
+    </style>
+</head>
+<body>
+
+    <div id="loading-screen"><div class="spinner"></div><h2 style="color:var(--primary); font-style:italic">KOUL</h2></div>
+
+    <div id="notification-bar"><span id="notif-message">BIENVENUE</span></div>
+
+    <header>
+        <h1 onclick="goToHome()" style="cursor:pointer">Koul</h1>
+        <button class="btn-pro-header" onclick="toggleLoginArea()">Pro</button>
+    </header>
+
+    <div id="login-container" class="numpad-container"><div class="pin-display" id="pin-view"></div><div class="numpad" id="pad-main"></div><button onclick="toggleLoginArea()" style="margin-top:15px; background:none; border:none; color:#888">ANNULER</button></div>
+    <div id="client-pin-container" class="numpad-container"><h3 style="color:var(--primary)">CODE SECRET</h3><div class="pin-display" id="client-pin-view"></div><div class="numpad" id="numpad-client"></div><button onclick="closeClientPin()" style="margin-top:15px; background:none; border:none; color:#888">ANNULER</button></div>
+    <div id="delivery-validation-container" class="numpad-container"><h3 style="color:var(--primary)">CODE CLIENT</h3><div class="pin-display" id="delivery-pin-view"></div><div class="numpad" id="numpad-delivery"></div><button onclick="closeDeliveryPin()" style="margin-top:15px; background:none; border:none; color:#888">ANNULER</button></div>
+
+    <div id="view-restaurants" class="view-section active container"><div class="grid-container" id="res-grid"></div></div>
+    <div id="view-menu-client" class="view-section container">
+        <button onclick="goToHome()" style="border:1px solid var(--primary); background:none; color:var(--primary); padding:8px; border-radius:5px; margin-bottom:15px">← RETOUR</button>
+        <h2 id="client-res-name"></h2><div id="plats-list-client"></div>
+    </div>
+
+    <div id="view-admin-space" class="view-section container">
+        <button onclick="goToHome()" style="border:1px solid var(--primary); background:none; color:var(--primary); padding:8px; border-radius:5px; margin-bottom:15px">← DÉCONNEXION</button>
+        <div class="dashboard-box">
+            <h2>Admin</h2>
+            <button class="btn-menu-pro" onclick="toggleSec('adm-promo')">Message Promo <span>📣</span></button>
+            <div id="adm-promo" class="sub-section">
+                <input type="text" id="adm-promo-txt" class="input-box" placeholder="Votre message promo...">
+                <button class="btn-pro-header" style="width:100%" onclick="updatePromoMessage()">METTRE À JOUR</button>
+            </div>
+
+            <button class="btn-menu-pro" onclick="toggleSec('adm-res')">Restos <span>⚙</span></button>
+            <div id="adm-res" class="sub-section">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px">
+                    <h4 style="margin:0">Liste des Restos</h4>
+                    <button onclick="toggleSec('form-res')" style="background:#007bff; color:white; border:none; border-radius:50%; width:30px; height:30px; font-weight:bold; cursor:pointer">+</button>
+                </div>
+                
+                <div id="form-res" class="inner-form">
+                    <input type="text" id="adm-res-n" class="input-box" placeholder="Nom du resto">
+                    <input type="text" id="adm-res-c" class="input-box" placeholder="Code secret">
+                    <input type="file" id="adm-res-img" class="input-box" accept="image/*">
+                    <button class="btn-pro-header" style="width:100%" onclick="adminCreateRes()">ENREGISTRER</button>
+                </div>
+
+                <div id="list-res-to-manage"></div>
+            </div>
+
+            <button class="btn-menu-pro" onclick="toggleSec('adm-liv')">Livreurs <span>⚙</span></button>
+            <div id="adm-liv" class="sub-section">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px">
+                    <h4 style="margin:0">Liste des Livreurs</h4>
+                    <button onclick="toggleSec('form-liv')" style="background:#007bff; color:white; border:none; border-radius:50%; width:30px; height:30px; font-weight:bold; cursor:pointer">+</button>
+                </div>
+
+                <div id="form-liv" class="inner-form">
+                    <input type="text" id="adm-liv-n" class="input-box" placeholder="Nom du livreur">
+                    <input type="text" id="adm-liv-c" class="input-box" placeholder="Code secret">
+                    <input type="file" id="adm-liv-img" class="input-box" accept="image/*">
+                    <button class="btn-pro-header" style="width:100%" onclick="adminCreateLiv()">ENREGISTRER</button>
+                </div>
+
+                <div id="list-liv-to-manage"></div>
+            </div>
+
+            <button class="btn-menu-pro" onclick="toggleSec('adm-history-box')">Journal Global <span>📜</span></button>
+            <div id="adm-history-box" class="sub-section">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px">
+                    <h3 style="margin:0">Journal Global</h3>
+                    <div><button class="btn-icon" onclick="exportHistory()">💾 TXT</button><button class="btn-icon" onclick="showClearConfirm()" style="color:#ff4444">🗑️</button></div>
+                </div>
+                <div id="clear-confirm-panel" class="confirm-panel"><p>Vider l'historique ?</p><button class="btn-finish" onclick="clearHistory()">OUI</button><button class="btn-reject" onclick="showClearConfirm(false)">NON</button></div>
+                <div id="admin-hist-list" style="max-height: 400px; overflow-y: auto;"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="view-pro-space" class="view-section container">
+        <button onclick="goToHome()" style="border:1px solid var(--primary); background:none; color:var(--primary); padding:8px; border-radius:5px; margin-bottom:15px">← DÉCONNEXION</button>
+        <div class="dashboard-box">
+            <h2 id="pro-res-title"></h2>
+            <div id="orders-list-pro"></div>
+            <button class="btn-menu-pro" onclick="toggleSec('add-plat')">Nouveau Plat <span>+</span></button>
+            <div id="add-plat" class="sub-section">
+                <input type="text" id="new-n" class="input-box" placeholder="Nom">
+                <input type="number" id="new-p" class="input-box" placeholder="Prix DZD">
+                <input type="number" id="new-s" class="input-box" placeholder="Stock">
+                <input type="file" id="new-img" class="input-box" accept="image/*">
+                <button class="btn-pro-header" style="width:100%" onclick="addNewPlat()">ENREGISTRER</button>
+            </div>
+            <button class="btn-menu-pro" onclick="toggleSec('manage-plats')">Stocks & Plats <span>⚙</span></button>
+            <div id="manage-plats" class="sub-section"></div>
+            <h3 style="margin-top:20px">Historique Restaurant</h3>
+            <div id="res-event-log" style="max-height:300px; overflow-y:auto;"></div>
+        </div>
+    </div>
+
+    <div id="view-livreur-space" class="view-section container">
+        <button onclick="logoutLivreur()" style="border:1px solid var(--primary); background:none; color:var(--primary); padding:8px; border-radius:5px; margin-bottom:15px">← DÉCONNEXION</button>
+        <div class="dashboard-box"><h2 id="liv-name"></h2><div id="liv-orders"></div><hr><div id="liv-hist"></div></div>
+    </div>
+
+    <div id="footer-cart">
+        <div id="cart-items-list" style="max-height:80px; overflow:auto; padding:10px; font-size:0.8rem"></div>
+        <div style="padding:0 10px"><input type="text" id="c-name" class="input-box" placeholder="Nom"><input type="tel" id="c-tel" class="input-box" placeholder="Tél"></div>
         <div style="padding:10px; justify-content:space-between; align-items:center">
             <b>Total: <span id="cart-total">0</span> DZD</b>
             <button class="btn-finish" style="flex:none; padding:10px 20px" onclick="openClientPin()">COMMANDER</button>
