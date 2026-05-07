@@ -23,15 +23,25 @@
         }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-        /* Barre de Suivi Commande Client */
-        #order-tracker-bar {
+        /* Barre de Suivi Multi-Commandes */
+        #order-tracker-container {
             display: none; background: #1e1e1e; border-bottom: 2px solid var(--primary);
-            padding: 10px 15px; font-size: 0.85rem; align-items: center; gap: 10px;
-            animation: slideDown 0.4s ease; sticky; top: 55px; z-index: 3999;
+            max-height: 150px; overflow-y: auto; position: sticky; top: 55px; z-index: 3999;
         }
-        @keyframes slideDown { from { transform: translateY(-100%); } to { transform: translateY(0); } }
-        .status-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--primary); box-shadow: 0 0 10px var(--primary); animation: pulse 1.5s infinite; }
+        .tracker-line {
+            padding: 10px 15px; border-bottom: 1px solid #333; display: flex; align-items: center; gap: 10px; font-size: 0.8rem;
+        }
+        .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--primary); box-shadow: 0 0 8px var(--primary); animation: pulse 1.5s infinite; }
         @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.3; } 100% { opacity: 1; } }
+
+        /* Système de Notation */
+        #rating-modal {
+            display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            background: #1a1a1a; padding: 25px; border-radius: 20px; border: 2px solid var(--primary);
+            z-index: 6000; width: 280px; text-align: center; box-shadow: 0 0 50px rgba(0,0,0,0.9);
+        }
+        .stars { color: #555; font-size: 1.5rem; cursor: pointer; margin: 10px 0; display: flex; justify-content: center; gap: 5px; }
+        .stars span.active { color: var(--primary); text-shadow: 0 0 10px var(--primary); }
 
         /* Zoom Image Plat */
         .img-plat-client { width: 60px; height: 60px; border-radius: 5px; object-fit: cover; transition: all 0.3s ease; cursor: pointer; z-index: 1; }
@@ -100,13 +110,19 @@
 
     <div id="notification-bar"><span id="notif-message">BIENVENUE</span></div>
     
-    <div id="order-tracker-bar">
-        <div class="status-dot"></div>
-        <div style="flex:1">
-            <b id="track-res-name" style="color:var(--primary)">RESTO</b>: 
-            <span id="track-status-text">Suivi de commande...</span>
+    <div id="order-tracker-container"></div>
+
+    <div id="rating-modal">
+        <h3 style="color:var(--primary); margin-top:0">Notation</h3>
+        <p style="font-size:0.8rem">Comment était le restaurant ?</p>
+        <div class="stars" id="star-resto">
+            <span onclick="setRate('resto', 1)">★</span><span onclick="setRate('resto', 2)">★</span><span onclick="setRate('resto', 3)">★</span><span onclick="setRate('resto', 4)">★</span><span onclick="setRate('resto', 5)">★</span>
         </div>
-        <small id="track-pin" style="background:#444; padding:2px 5px; border-radius:3px"></small>
+        <p style="font-size:0.8rem">Et le livreur ?</p>
+        <div class="stars" id="star-livreur">
+            <span onclick="setRate('livreur', 1)">★</span><span onclick="setRate('livreur', 2)">★</span><span onclick="setRate('livreur', 3)">★</span><span onclick="setRate('livreur', 4)">★</span><span onclick="setRate('livreur', 5)">★</span>
+        </div>
+        <button class="btn-pro-header" style="width:100%; margin-top:10px" onclick="submitRating()">VALIDER</button>
     </div>
 
     <header>
@@ -227,7 +243,7 @@
         const db = firebase.database();
 
         let restaurants = [], livreurs = [], adminHistory = [], cart = {}, currentRes = null, currentLivreur = null, currentPin = "", clientTempPin = "", deliveryTempPin = "";
-        let pendingResId = null, pendingOrderId = null;
+        let pendingResId = null, pendingOrderId = null, rates = {resto:0, livreur:0};
         let promoMessage = "BIENVENUE";
 
         db.ref('cloud_koul').on('value', (snapshot) => {
@@ -253,31 +269,70 @@
             if(document.getElementById('view-restaurants').classList.contains('active')) { init(); }
         });
 
-        // --- SUIVI CLIENT CORRIGÉ ---
+        // --- GESTION MULTI-SUIVI ET NOTATION ---
         function checkActiveOrder() {
-            const trackData = JSON.parse(localStorage.getItem('koul_active_order'));
-            const bar = document.getElementById('order-tracker-bar');
-            if(!trackData) { bar.style.display = 'none'; return; }
-
-            const res = restaurants.find(r => r.id === trackData.resId);
-            if(!res || !res.orders) { bar.style.display = 'none'; return; }
-
-            // Recherche précise par ID de commande
-            const order = res.orders.find(o => o.id === trackData.orderId);
-            if(!order) {
-                localStorage.removeItem('koul_active_order');
-                bar.style.display = 'none';
-                return;
-            }
-
-            bar.style.display = 'flex';
-            document.getElementById('track-res-name').innerText = res.name.toUpperCase();
-            document.getElementById('track-pin').innerText = "CODE: " + order.pin;
+            let trackedOrders = JSON.parse(localStorage.getItem('koul_tracked_orders') || "[]");
+            const container = document.getElementById('order-tracker-container');
             
-            let statusTxt = "En préparation...";
-            if(order.status === 'waiting') statusTxt = "Prête ! En attente d'un livreur...";
-            if(order.status === 'shipping') statusTxt = "En cours de livraison 🛵";
-            document.getElementById('track-status-text').innerText = statusTxt;
+            if(trackedOrders.length === 0) { container.style.display = 'none'; return; }
+
+            container.innerHTML = '';
+            let hasVisible = false;
+
+            trackedOrders.forEach((track, index) => {
+                const res = restaurants.find(r => r.id === track.resId);
+                const order = res ? (res.orders || []).find(o => o.id === track.orderId) : null;
+
+                if(!order) {
+                    // Si la commande n'existe plus dans Firebase, elle est livrée !
+                    if(!track.rated) { 
+                        showRatingModal(track.resId, track.orderId, index); 
+                        track.rated = true; 
+                        localStorage.setItem('koul_tracked_orders', JSON.stringify(trackedOrders));
+                    }
+                    return;
+                }
+
+                hasVisible = true;
+                let statusTxt = "Préparation";
+                if(order.status === 'waiting') statusTxt = "Prête !";
+                if(order.status === 'shipping') statusTxt = "En livraison 🛵";
+
+                container.innerHTML += `
+                    <div class="tracker-line">
+                        <div class="status-dot"></div>
+                        <div style="flex:1"><b>${res.name.toUpperCase()}</b>: ${statusTxt}</div>
+                        <small style="background:#444; padding:2px 5px; border-radius:3px">CODE: ${order.pin}</small>
+                    </div>`;
+            });
+
+            container.style.display = hasVisible ? 'block' : 'none';
+        }
+
+        function showRatingModal(rid, oid, idx) {
+            pendingResId = rid; pendingOrderId = oid;
+            rates = {resto:0, livreur:0};
+            document.querySelectorAll('.stars span').forEach(s => s.classList.remove('active'));
+            document.getElementById('rating-modal').style.display = 'block';
+        }
+
+        function setRate(type, val) {
+            rates[type] = val;
+            const stars = document.getElementById(`star-${type}`).querySelectorAll('span');
+            stars.forEach((s, i) => s.classList.toggle('active', i < val));
+        }
+
+        function submitRating() {
+            if(rates.resto === 0 || rates.livreur === 0) return setNotif("NOTATION REQUISE");
+            // Ici on pourrait envoyer les notes à Firebase pour les stats admin
+            logAdminEvent("AVIS CLIENT", `Resto: ${rates.resto}* | Livreur: ${rates.livreur}*`);
+            document.getElementById('rating-modal').style.display = 'none';
+            
+            let tracked = JSON.parse(localStorage.getItem('koul_tracked_orders') || "[]");
+            tracked = tracked.filter(t => t.orderId !== pendingOrderId);
+            localStorage.setItem('koul_tracked_orders', JSON.stringify(tracked));
+            setNotif("MERCI POUR VOTRE AVIS !");
+            checkActiveOrder();
         }
 
         function compressImage(file, maxWidth, callback) {
@@ -544,7 +599,6 @@
         function openClientPin() { if(!document.getElementById('c-name').value) return setNotif("NOM REQUIS"); document.getElementById('client-pin-container').style.display='block'; clientTempPin=""; document.getElementById('client-pin-view').innerText=""; }
         function closeClientPin() { document.getElementById('client-pin-container').style.display='none'; }
         
-        // --- VALIDATION CORRIGÉE ---
         function confirmClientOrder() { 
             if(clientTempPin.length < 4) return; 
             const itemsList = Object.values(cart); 
@@ -553,28 +607,18 @@
             if(!restaurants[resIndex].orders) restaurants[resIndex].orders = []; 
 
             const orderId = Date.now();
-            const clientName = document.getElementById('c-name').value;
-            const clientTel = document.getElementById('c-tel').value;
-            const finalTotal = document.getElementById('cart-total').innerText;
-            const finalPin = clientTempPin;
-
+            const order = { id: orderId, client: document.getElementById('c-name').value, tel: document.getElementById('c-tel').value, rawItems: itemsList, itemsText: itemsList.map(i => `${i.qte}x ${i.n}`).join(', '), total: document.getElementById('cart-total').innerText, pin: clientTempPin, status: 'new' }; 
+            
+            // SAUVEGARDE MULTI-SUIVI
+            let tracked = JSON.parse(localStorage.getItem('koul_tracked_orders') || "[]");
+            tracked.push({ resId: currentRes.id, orderId: orderId, rated: false });
+            localStorage.setItem('koul_tracked_orders', JSON.stringify(tracked));
+            
             itemsList.forEach(item => { const plat = restaurants[resIndex].plats.find(p => p.id === item.id); if(plat) plat.stock -= item.qte; });
-            const order = { id: orderId, client: clientName, tel: clientTel, rawItems: itemsList, itemsText: itemsList.map(i => `${i.qte}x ${i.n}`).join(', '), total: finalTotal, pin: finalPin, status: 'new' }; 
-            
-            // 1. Sauvegarde locale immédiate
-            localStorage.setItem('koul_active_order', JSON.stringify({ resId: currentRes.id, orderId: orderId }));
-            
-            // 2. Envoi Firebase
             restaurants[resIndex].orders.push(order); 
             logResEvent(restaurants[resIndex], "NOUVELLE COMMANDE", order);
             pushData(); 
-
-            // 3. Interface immédiate
-            setNotif("COMMANDE RÉUSSIE"); 
-            closeClientPin(); 
-            cart = {};
-            checkActiveOrder(); // Force l'affichage de la barre maintenant
-            goToHome(); 
+            setNotif("COMMANDE RÉUSSIE"); closeClientPin(); cart = {}; checkActiveOrder(); goToHome(); 
         }
 
         function showClearConfirm(show = true) { document.getElementById('clear-confirm-panel').style.display = show ? 'block' : 'none'; }
