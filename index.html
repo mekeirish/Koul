@@ -157,7 +157,12 @@
         <button onclick="goToHome()" style="border:1px solid var(--primary); background:none; color:var(--primary); padding:8px; border-radius:5px; margin-bottom:15px">← DÉCONNEXION</button>
         <div class="dashboard-box">
             <h2 id="pro-res-title"></h2>
-            <div id="orders-list-pro"></div>
+            
+            <button class="btn-menu-pro" onclick="toggleSec('orders-list-pro-container')">Commandes en cours 📋</button>
+            <div id="orders-list-pro-container" class="sub-section" style="display: block;">
+                <div id="orders-list-pro"></div>
+            </div>
+
             <button class="btn-menu-pro" onclick="toggleSec('add-plat')">Nouveau Plat <span>+</span></button>
             <div id="add-plat" class="sub-section">
                 <input type="text" id="new-n" class="input-box" placeholder="Nom">
@@ -413,16 +418,21 @@
         }
         
         function renderProOrders() {
-            const l = document.getElementById('orders-list-pro'); l.innerHTML = '<h3>Commandes Actives</h3>';
-            if(currentRes.orders) currentRes.orders.forEach((o, i) => {
-                let statusColor = o.status === 'new' ? 'white' : (o.status === 'waiting' ? 'orange' : 'cyan');
-                let statusText = o.status === 'new' ? 'REÇUE' : (o.status === 'waiting' ? 'PUBLIÉE' : (o.livName ? `Prise par ${o.livName}` : 'EN COURS'));
-                l.innerHTML += `<div class="order-card-pro" style="border-left: 5px solid ${statusColor}"><div style="display:flex; justify-content:space-between"><b>${o.client}</b> <small>${statusText}</small></div><small>${o.itemsText}</small><br><b>${o.total} DZD</b><div class="order-actions"><a href="tel:${o.tel}" class="btn-call">APPELER</a>${o.status === 'new' ? `<button class="btn-finish" onclick="updateOrderStatus(${i}, 'waiting')">PUBLIER</button>` : ''}${o.status === 'new' ? `<button class="btn-reject" onclick="cancelOrder(${o.id})">ANNULER</button>` : ''}${o.status === 'waiting' || o.status === 'shipping' ? `<button class="btn-finish" style="background:#28a745" onclick="openValPin(${currentRes.id}, ${o.id})">CLÔTURER</button>` : ''}</div></div>`;
-            });
+            const l = document.getElementById('orders-list-pro'); l.innerHTML = '';
+            if(currentRes.orders && currentRes.orders.length > 0) {
+                currentRes.orders.forEach((o, i) => {
+                    let statusColor = o.status === 'new' ? 'white' : (o.status === 'waiting' ? 'orange' : 'cyan');
+                    let statusText = o.status === 'new' ? 'REÇUE' : (o.status === 'waiting' ? 'PUBLIÉE' : (o.livName ? `Prise par ${o.livName}` : 'EN COURS'));
+                    l.innerHTML += `<div class="order-card-pro" style="border-left: 5px solid ${statusColor}"><div style="display:flex; justify-content:space-between"><b>${o.client}</b> <small>${statusText}</small></div><small>${o.itemsText}</small><br><b>${o.total} DZD</b><div class="order-actions"><a href="tel:${o.tel}" class="btn-call">APPELER</a>${o.status === 'new' ? `<button class="btn-finish" onclick="updateOrderStatus(${i}, 'waiting')">PUBLIER</button>` : ''}<button class="btn-reject" onclick="cancelOrder(${o.id})">SUPPRIMER</button>${o.status === 'waiting' || o.status === 'shipping' ? `<button class="btn-finish" style="background:#28a745" onclick="openValPin(${currentRes.id}, ${o.id})">CLÔTURER</button>` : ''}</div></div>`;
+                });
+            } else {
+                l.innerHTML = '<p style="text-align:center; color:#888;">Aucune commande en cours.</p>';
+            }
         }
         function updateOrderStatus(idx, status) { const o = currentRes.orders[idx]; o.status = status; logResEvent(currentRes, "COMMANDE PUBLIÉE", o); renderProOrders(); setNotif("COMMANDE PUBLIÉE"); pushData(); }
         
         function cancelOrder(oid) { 
+            if(!confirm("Supprimer définitivement cette commande ?")) return;
             const idx = currentRes.orders.findIndex(x => x.id === oid);
             if(idx > -1) {
                 const o = currentRes.orders[idx];
@@ -430,9 +440,9 @@
                     const plat = currentRes.plats.find(p => p.id === item.id);
                     if(plat) plat.stock += item.qte;
                 });
-                logResEvent(currentRes, "COMMANDE REJETÉE", o); 
+                logResEvent(currentRes, "COMMANDE SUPPRIMÉE", o); 
                 currentRes.orders.splice(idx, 1);
-                renderProOrders(); setNotif("COMMANDE ANNULÉE (STOCK RENDU)"); pushData(); 
+                renderProOrders(); setNotif("COMMANDE SUPPRIMÉE"); pushData(); 
             }
         }
         
@@ -577,7 +587,7 @@
         }
 
         function showClearConfirm(show = true) { document.getElementById('clear-confirm-panel').style.display = show ? 'block' : 'none'; }
-        function toggleSec(id) { const s = document.getElementById(id); s.style.display = s.style.display==='block'?'none':'block'; }
+        function toggleSec(id) { const s = document.getElementById(id); s.style.display = (s.style.display==='block' || s.style.display==='') ? 'none' : 'block'; }
         function logoutLivreur() { currentLivreur = null; goToHome(); }
         
         function exportHistory() { 
@@ -599,4 +609,3 @@
     </script>
 </body>
 </html>
-
