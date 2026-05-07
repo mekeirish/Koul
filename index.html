@@ -74,8 +74,9 @@
 
         .container { padding: 15px; }
         .grid-container { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; }
-        .card { background-color: #3d3d3d; border-radius: 12px; padding: 10px; text-align: center; cursor: pointer; border: 1px solid #444; }
+        .card { background-color: #3d3d3d; border-radius: 12px; padding: 10px; text-align: center; cursor: pointer; border: 1px solid #444; position: relative; }
         .card img { width: 100%; height: 80px; object-fit: cover; border-radius: 8px; margin-bottom: 5px; }
+        .closed-badge { position: absolute; top: 10px; left: 10px; background: red; color: white; padding: 2px 5px; border-radius: 4px; font-size: 0.7rem; font-weight: bold; }
 
         .dashboard-box { background-color: rgba(30, 30, 30, 0.9); border-radius: 15px; padding: 20px; border: 1px solid var(--primary); }
         .btn-menu-pro { width: 100%; background-color: #444; color: white; border: 1px solid #555; padding: 15px; margin-top: 10px; border-radius: 8px; font-weight: bold; display: flex; justify-content: space-between; align-items: center; }
@@ -99,6 +100,10 @@
         .view-section { display: none; }
         .active { display: block; }
         .confirm-panel { background: #4d0000; padding: 10px; border-radius: 5px; margin-top: 10px; display: none; text-align: center; border: 1px solid #ff4444; }
+        
+        .toggle-status-btn { padding: 5px 10px; border-radius: 5px; border: none; font-weight: bold; cursor: pointer; font-size: 0.8rem; margin-left: 10px; }
+        .status-open { background: #28a745; color: white; }
+        .status-closed { background: #cc0000; color: white; }
     </style>
 </head>
 <body>
@@ -191,7 +196,10 @@
     <div id="view-pro-space" class="view-section container">
         <button onclick="goToHome()" style="border:1px solid var(--primary); background:none; color:var(--primary); padding:8px; border-radius:5px; margin-bottom:15px">← DÉCONNEXION</button>
         <div class="dashboard-box">
-            <h2 id="pro-res-title"></h2>
+            <div style="display:flex; align-items:center; margin-bottom:15px">
+                <h2 id="pro-res-title" style="margin:0"></h2>
+                <button id="pro-toggle-status" class="toggle-status-btn" onclick="toggleResStatus()">...</button>
+            </div>
             
             <button class="btn-menu-pro" onclick="toggleSec('orders-list-pro-container')">Commandes en cours 📋</button>
             <div id="orders-list-pro-container" class="sub-section" style="display: block;">
@@ -222,11 +230,14 @@
 
     <div id="footer-cart">
         <div id="cart-items-list" style="max-height:80px; overflow:auto; padding:10px; font-size:0.8rem"></div>
-        <div style="padding:0 10px"><input type="text" id="c-name" class="input-box" placeholder="Nom"><input type="tel" id="c-tel" class="input-box" placeholder="Tél"></div>
-        <div style="padding:10px; display:flex; justify-content:space-between; align-items:center">
-            <b>Total: <span id="cart-total">0</span> DZD</b>
-            <button class="btn-finish" style="flex:none; padding:10px 20px" onclick="openClientPin()">COMMANDER</button>
+        <div id="footer-form-client">
+            <div style="padding:0 10px"><input type="text" id="c-name" class="input-box" placeholder="Nom"><input type="tel" id="c-tel" class="input-box" placeholder="Tél"></div>
+            <div style="padding:10px; display:flex; justify-content:space-between; align-items:center">
+                <b>Total: <span id="cart-total">0</span> DZD</b>
+                <button class="btn-finish" style="flex:none; padding:10px 20px" onclick="openClientPin()">COMMANDER</button>
+            </div>
         </div>
+        <div id="footer-closed-msg" style="display:none; text-align:center; padding:15px; background:red; color:white; font-weight:bold">RESTAURANT FERMÉ POUR LE MOMENT</div>
     </div>
 
     <script>
@@ -269,49 +280,30 @@
             if(document.getElementById('view-restaurants').classList.contains('active')) { init(); }
         });
 
-        // --- GESTION MULTI-SUIVI ET NOTATION ---
         function checkActiveOrder() {
             let trackedOrders = JSON.parse(localStorage.getItem('koul_tracked_orders') || "[]");
             const container = document.getElementById('order-tracker-container');
-            
             if(trackedOrders.length === 0) { container.style.display = 'none'; return; }
-
             container.innerHTML = '';
             let hasVisible = false;
-
             trackedOrders.forEach((track, index) => {
                 const res = restaurants.find(r => r.id === track.resId);
                 const order = res ? (res.orders || []).find(o => o.id === track.orderId) : null;
-
                 if(!order) {
-                    // Si la commande n'existe plus dans Firebase, elle est livrée !
-                    if(!track.rated) { 
-                        showRatingModal(track.resId, track.orderId, index); 
-                        track.rated = true; 
-                        localStorage.setItem('koul_tracked_orders', JSON.stringify(trackedOrders));
-                    }
+                    if(!track.rated) { showRatingModal(track.resId, track.orderId, index); track.rated = true; localStorage.setItem('koul_tracked_orders', JSON.stringify(trackedOrders)); }
                     return;
                 }
-
                 hasVisible = true;
                 let statusTxt = "Préparation";
                 if(order.status === 'waiting') statusTxt = "Prête !";
                 if(order.status === 'shipping') statusTxt = "En livraison 🛵";
-
-                container.innerHTML += `
-                    <div class="tracker-line">
-                        <div class="status-dot"></div>
-                        <div style="flex:1"><b>${res.name.toUpperCase()}</b>: ${statusTxt}</div>
-                        <small style="background:#444; padding:2px 5px; border-radius:3px">CODE: ${order.pin}</small>
-                    </div>`;
+                container.innerHTML += `<div class="tracker-line"><div class="status-dot"></div><div style="flex:1"><b>${res.name.toUpperCase()}</b>: ${statusTxt}</div><small style="background:#444; padding:2px 5px; border-radius:3px">CODE: ${order.pin}</small></div>`;
             });
-
             container.style.display = hasVisible ? 'block' : 'none';
         }
 
         function showRatingModal(rid, oid, idx) {
-            pendingResId = rid; pendingOrderId = oid;
-            rates = {resto:0, livreur:0};
+            pendingResId = rid; pendingOrderId = oid; rates = {resto:0, livreur:0};
             document.querySelectorAll('.stars span').forEach(s => s.classList.remove('active'));
             document.getElementById('rating-modal').style.display = 'block';
         }
@@ -324,10 +316,8 @@
 
         function submitRating() {
             if(rates.resto === 0 || rates.livreur === 0) return setNotif("NOTATION REQUISE");
-            // Ici on pourrait envoyer les notes à Firebase pour les stats admin
             logAdminEvent("AVIS CLIENT", `Resto: ${rates.resto}* | Livreur: ${rates.livreur}*`);
             document.getElementById('rating-modal').style.display = 'none';
-            
             let tracked = JSON.parse(localStorage.getItem('koul_tracked_orders') || "[]");
             tracked = tracked.filter(t => t.orderId !== pendingOrderId);
             localStorage.setItem('koul_tracked_orders', JSON.stringify(tracked));
@@ -336,61 +326,50 @@
         }
 
         function compressImage(file, maxWidth, callback) {
-            const reader = new FileReader();
-            reader.readAsDataURL(file);
+            const reader = new FileReader(); reader.readAsDataURL(file);
             reader.onload = (event) => {
-                const img = new Image();
-                img.src = event.target.result;
+                const img = new Image(); img.src = event.target.result;
                 img.onload = () => {
-                    const canvas = document.createElement('canvas');
-                    const scale = maxWidth / img.width;
-                    canvas.width = maxWidth;
-                    canvas.height = img.height * scale;
-                    const ctx = canvas.getContext('2d');
-                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                    const canvas = document.createElement('canvas'); const scale = maxWidth / img.width;
+                    canvas.width = maxWidth; canvas.height = img.height * scale;
+                    const ctx = canvas.getContext('2d'); ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
                     callback(canvas.toDataURL('image/jpeg', 0.7));
                 };
             };
         }
 
         function refreshCurrentView() {
-            if(document.getElementById('view-admin-space').classList.contains('active')) {
-                renderAdminResList(); renderAdminLivList(); renderAdminHistory();
-            }
-            if(document.getElementById('view-pro-space').classList.contains('active') && currentRes) {
-                renderProOrders(); renderProPlats(); renderResHistory();
-            }
-            if(document.getElementById('view-livreur-space').classList.contains('active') && currentLivreur) {
-                renderLivreurOrders(); renderLivreurHistory();
-            }
+            if(document.getElementById('view-admin-space').classList.contains('active')) { renderAdminResList(); renderAdminLivList(); renderAdminHistory(); }
+            if(document.getElementById('view-pro-space').classList.contains('active') && currentRes) { renderProOrders(); renderProPlats(); renderResHistory(); updateProStatusUI(); }
+            if(document.getElementById('view-livreur-space').classList.contains('active') && currentLivreur) { renderLivreurOrders(); renderLivreurHistory(); }
+            if(document.getElementById('view-menu-client').classList.contains('active')) { renderClientPlats(); updateCartUI(); }
+        }
+
+        function updateProStatusUI() {
+            const btn = document.getElementById('pro-toggle-status');
+            const isOpen = currentRes.open !== false;
+            btn.innerText = isOpen ? "OUVERT" : "FERMÉ";
+            btn.className = "toggle-status-btn " + (isOpen ? "status-open" : "status-closed");
+        }
+
+        function toggleResStatus() {
+            currentRes.open = (currentRes.open === false);
+            pushData();
+            setNotif(currentRes.open ? "RESTAURANT OUVERT" : "RESTAURANT FERMÉ");
         }
 
         const vibrate = (ms = 50) => { if(navigator.vibrate) navigator.vibrate(ms); };
 
         function setNotif(msg) { 
-            vibrate(100);
-            const bar = document.getElementById('notification-bar');
+            vibrate(100); const bar = document.getElementById('notification-bar');
             document.getElementById('notif-message').innerText = msg;
             bar.style.backgroundColor = "#ffcc00"; bar.style.color = "#000";
-            setTimeout(() => { 
-                bar.style.backgroundColor = "#000"; bar.style.color = "#ffcc00"; 
-                document.getElementById('notif-message').innerText = promoMessage;
-            }, 3000);
+            setTimeout(() => { bar.style.backgroundColor = "#000"; bar.style.color = "#ffcc00"; document.getElementById('notif-message').innerText = promoMessage; }, 3000);
         }
 
-        function pushData() {
-            db.ref('cloud_koul').set({ 
-                restaurants: restaurants || [], 
-                livreurs: livreurs || [], 
-                adminHistory: adminHistory || [], 
-                promoMessage: promoMessage || "BIENVENUE"
-            });
-        }
+        function pushData() { db.ref('cloud_koul').set({ restaurants: restaurants || [], livreurs: livreurs || [], adminHistory: adminHistory || [], promoMessage: promoMessage || "BIENVENUE" }); }
 
-        function updatePromoMessage() {
-            const newTxt = document.getElementById('adm-promo-txt').value;
-            if(newTxt) { promoMessage = newTxt; logAdminEvent("ADMIN", `Promo modifiée: ${newTxt}`); setNotif("MESSAGE PROMO MIS À JOUR"); pushData(); }
-        }
+        function updatePromoMessage() { const newTxt = document.getElementById('adm-promo-txt').value; if(newTxt) { promoMessage = newTxt; logAdminEvent("ADMIN", `Promo modifiée: ${newTxt}`); setNotif("MESSAGE PROMO MIS À JOUR"); pushData(); } }
 
         function generatePads() {
             const pads = ['pad-main', 'numpad-client', 'numpad-delivery'];
@@ -410,23 +389,16 @@
             if(id === 'numpad-delivery') { if(v==='C') deliveryTempPin=""; else if(deliveryTempPin.length<4) deliveryTempPin+=v; document.getElementById('delivery-pin-view').innerText=deliveryTempPin; }
         }
 
-        function submitPad(id) {
-            if(id === 'pad-main') processLogin();
-            if(id === 'numpad-client') confirmClientOrder();
-            if(id === 'numpad-delivery') confirmDelivery();
-        }
+        function submitPad(id) { if(id === 'pad-main') processLogin(); if(id === 'numpad-client') confirmClientOrder(); if(id === 'numpad-delivery') confirmDelivery(); }
 
-        function toggleLoginArea() { 
-            const a = document.getElementById('login-container'); a.style.display = a.style.display==='block'?'none':'block'; 
-            currentPin=""; document.getElementById('pin-view').innerText=""; 
-        }
+        function toggleLoginArea() { const a = document.getElementById('login-container'); a.style.display = a.style.display==='block'?'none':'block'; currentPin=""; document.getElementById('pin-view').innerText=""; }
 
         function processLogin() {
             const pin = currentPin; toggleLoginArea();
             if(pin === "1747") { showSection('view-admin-space'); renderAdminResList(); renderAdminLivList(); renderAdminHistory(); } 
             else {
                 const r = restaurants.find(x => x.code === pin), l = livreurs.find(x => x.code === pin);
-                if(r) { currentRes = r; showSection('view-pro-space'); document.getElementById('pro-res-title').innerText = r.name; renderProOrders(); renderProPlats(); renderResHistory(); }
+                if(r) { currentRes = r; showSection('view-pro-space'); document.getElementById('pro-res-title').innerText = r.name; renderProOrders(); renderProPlats(); renderResHistory(); updateProStatusUI(); }
                 else if(l) { currentLivreur = l; showSection('view-livreur-space'); document.getElementById('liv-name').innerText = l.name; renderLivreurOrders(); renderLivreurHistory(); }
                 else { vibrate([50, 50, 50]); setNotif("CODE ERRONÉ"); }
             }
@@ -443,7 +415,7 @@
         function adminCreateRes() {
             const n = document.getElementById('adm-res-n').value, c = document.getElementById('adm-res-c').value, f = document.getElementById('adm-res-img').files[0];
             if(n && c) {
-                const add = (imgData) => { restaurants.push({id:Date.now(), name:n, code:c, img:imgData, plats:[], orders:[], eventHistory:[]}); logAdminEvent("SYSTEM", `Resto créé: ${n}`); renderAdminResList(); setNotif("RESTO AJOUTÉ"); pushData(); };
+                const add = (imgData) => { restaurants.push({id:Date.now(), name:n, code:c, img:imgData, plats:[], orders:[], eventHistory:[], open: true}); logAdminEvent("SYSTEM", `Resto créé: ${n}`); renderAdminResList(); setNotif("RESTO AJOUTÉ"); pushData(); };
                 if(f) compressImage(f, 400, add); else add('');
             }
         }
@@ -454,62 +426,26 @@
                 if(f) compressImage(f, 300, add); else add('');
             }
         }
-        function logAdminEvent(type, details) { 
-            const now = new Date();
-            adminHistory.unshift({ type, details, time: String(now.getHours()).padStart(2, '0') + ":" + String(now.getMinutes()).padStart(2, '0'), date: now.toLocaleDateString() }); 
-            pushData(); 
-        }
-        function logResEvent(res, status, order) { 
-            if(!res.eventHistory) res.eventHistory = []; 
-            const now = new Date();
-            const timeStr = String(now.getHours()).padStart(2, '0') + ":" + String(now.getMinutes()).padStart(2, '0');
-            res.eventHistory.unshift({ status, client: order.client, items: order.itemsText || (order.items ? order.items.join(', ') : ''), time: timeStr, date: now.toLocaleDateString() }); 
-            logAdminEvent(res.name.toUpperCase(), `${status} - Client: ${order.client}`);
-        }
+        function logAdminEvent(type, details) { const now = new Date(); adminHistory.unshift({ type, details, time: String(now.getHours()).padStart(2, '0') + ":" + String(now.getMinutes()).padStart(2, '0'), date: now.toLocaleDateString() }); pushData(); }
+        function logResEvent(res, status, order) { if(!res.eventHistory) res.eventHistory = []; const now = new Date(); const timeStr = String(now.getHours()).padStart(2, '0') + ":" + String(now.getMinutes()).padStart(2, '0'); res.eventHistory.unshift({ status, client: order.client, items: order.itemsText || (order.items ? order.items.join(', ') : ''), time: timeStr, date: now.toLocaleDateString() }); logAdminEvent(res.name.toUpperCase(), `${status} - Client: ${order.client}`); }
         
-        function renderAdminResList() { 
-            const l = document.getElementById('list-res-to-manage'); l.innerHTML = ''; 
-            restaurants.forEach((r) => l.innerHTML += `<div style="display:flex;justify-content:space-between;background:#222;padding:5px;margin-bottom:2px"><span>${r.name} <b>(Code: ${r.code})</b></span><button onclick="deleteRes(${r.id})" style="color:red;border:none;background:none">X</button></div>`); 
-        }
-        function deleteRes(id) { 
-            const r = restaurants.find(x => x.id === id);
-            if(confirm("Supprimer ce restaurant ?")) { logAdminEvent("SYSTEM", `Resto supprimé: ${r.name}`); restaurants = restaurants.filter(x => x.id !== id); pushData(); renderAdminResList(); } 
-        }
-        function renderAdminLivList() { 
-            const l = document.getElementById('list-liv-to-manage'); l.innerHTML = ''; 
-            livreurs.forEach((liv) => l.innerHTML += `<div style="display:flex;justify-content:space-between;background:#222;padding:5px;margin-bottom:2px"><span>${liv.name} <b>(Code: ${liv.code})</b></span><button onclick="deleteLiv(${liv.id})" style="color:red;border:none;background:none">X</button></div>`); 
-        }
-        function deleteLiv(id) { 
-            const l = livreurs.find(x => x.id === id);
-            if(confirm("Supprimer ce livreur ?")) { logAdminEvent("SYSTEM", `Livreur supprimé: ${l.name}`); livreurs = livreurs.filter(x => x.id !== id); pushData(); renderAdminLivList(); } 
-        }
+        function renderAdminResList() { const l = document.getElementById('list-res-to-manage'); l.innerHTML = ''; restaurants.forEach((r) => l.innerHTML += `<div style="display:flex;justify-content:space-between;background:#222;padding:5px;margin-bottom:2px"><span>${r.name} <b>(Code: ${r.code})</b></span><button onclick="deleteRes(${r.id})" style="color:red;border:none;background:none">X</button></div>`); }
+        function deleteRes(id) { const r = restaurants.find(x => x.id === id); if(confirm("Supprimer ce restaurant ?")) { logAdminEvent("SYSTEM", `Resto supprimé: ${r.name}`); restaurants = restaurants.filter(x => x.id !== id); pushData(); renderAdminResList(); } }
+        function renderAdminLivList() { const l = document.getElementById('list-liv-to-manage'); l.innerHTML = ''; livreurs.forEach((liv) => l.innerHTML += `<div style="display:flex;justify-content:space-between;background:#222;padding:5px;margin-bottom:2px"><span>${liv.name} <b>(Code: ${liv.code})</b></span><button onclick="deleteLiv(${liv.id})" style="color:red;border:none;background:none">X</button></div>`); }
+        function deleteLiv(id) { const l = livreurs.find(x => x.id === id); if(confirm("Supprimer ce livreur ?")) { logAdminEvent("SYSTEM", `Livreur supprimé: ${l.name}`); livreurs = livreurs.filter(x => x.id !== id); pushData(); renderAdminLivList(); } }
         function renderAdminHistory() { const l = document.getElementById('admin-hist-list'); l.innerHTML = ''; adminHistory.forEach(h => { l.innerHTML += `<div class="hist-card"><span class="type-tag">${h.type}</span><br><b>${h.details}</b><br><small>${h.date} ${h.time}</small></div>`; }); }
         function clearHistory() { adminHistory = []; pushData(); showClearConfirm(false); setNotif("HISTORIQUE VIDÉ"); }
 
         function addNewPlat() {
             const nInput = document.getElementById('new-n'), pInput = document.getElementById('new-p'), sInput = document.getElementById('new-s'), imgInput = document.getElementById('new-img');
             if(nInput.value && pInput.value) {
-                const add = (imgData) => { 
-                    if(!currentRes.plats) currentRes.plats = []; 
-                    currentRes.plats.push({id:Date.now(), n:nInput.value, p:parseInt(pInput.value), stock:parseInt(sInput.value)||0, img:imgData}); 
-                    logAdminEvent(currentRes.name, `Plat ajouté: ${nInput.value}`); setNotif("PLAT AJOUTÉ"); renderProPlats(); 
-                    nInput.value = ""; pInput.value = ""; sInput.value = ""; imgInput.value = ""; pushData(); 
-                };
+                const add = (imgData) => { if(!currentRes.plats) currentRes.plats = []; currentRes.plats.push({id:Date.now(), n:nInput.value, p:parseInt(pInput.value), stock:parseInt(sInput.value)||0, img:imgData}); logAdminEvent(currentRes.name, `Plat ajouté: ${nInput.value}`); setNotif("PLAT AJOUTÉ"); renderProPlats(); nInput.value = ""; pInput.value = ""; sInput.value = ""; imgInput.value = ""; pushData(); };
                 if(imgInput.files[0]) compressImage(imgInput.files[0], 500, add); else add('');
             }
         }
         function renderProPlats() { const l = document.getElementById('manage-plats'); l.innerHTML = ''; if(currentRes.plats) currentRes.plats.forEach((p, i) => { l.innerHTML += `<div class="plat-manage-card"><img src="${p.img}" class="mini-img"><div style="flex:1"><b>${p.n}</b><br><small>${p.p} DZD</small></div><div style="display:flex; align-items:center"><input type="number" value="${p.stock}" id="stk-${i}" style="width:50px; background:#222; border:1px solid #555; color:white; padding:5px"><button class="btn-icon" onclick="updateStock(${i})">OK</button><button class="btn-icon" onclick="deletePlat(${p.id})" style="color:red">X</button></div></div>`; }); }
-        function deletePlat(id) { 
-            const p = currentRes.plats.find(x => x.id === id);
-            logAdminEvent(currentRes.name, `Plat supprimé: ${p.n}`);
-            currentRes.plats = currentRes.plats.filter(x => x.id !== id); pushData(); renderProPlats(); 
-        }
-        function updateStock(i) { 
-            const p = currentRes.plats[i];
-            const newStk = parseInt(document.getElementById(`stk-${i}`).value);
-            logAdminEvent(currentRes.name, `Stock ${p.n} : ${p.stock} -> ${newStk}`);
-            p.stock = newStk; setNotif("STOCK MIS À JOUR"); pushData(); 
-        }
+        function deletePlat(id) { const p = currentRes.plats.find(x => x.id === id); logAdminEvent(currentRes.name, `Plat supprimé: ${p.n}`); currentRes.plats = currentRes.plats.filter(x => x.id !== id); pushData(); renderProPlats(); }
+        function updateStock(i) { const p = currentRes.plats[i]; const newStk = parseInt(document.getElementById(`stk-${i}`).value); logAdminEvent(currentRes.name, `Stock ${p.n} : ${p.stock} -> ${newStk}`); p.stock = newStk; setNotif("STOCK MIS À JOUR"); pushData(); }
         function renderProOrders() {
             const l = document.getElementById('orders-list-pro'); l.innerHTML = '';
             if(currentRes.orders && currentRes.orders.length > 0) {
@@ -521,23 +457,10 @@
             } else { l.innerHTML = '<p style="text-align:center; color:#888;">Aucune commande en cours.</p>'; }
         }
         function updateOrderStatus(idx, status) { const o = currentRes.orders[idx]; o.status = status; logResEvent(currentRes, "COMMANDE PUBLIÉE", o); renderProOrders(); setNotif("COMMANDE PUBLIÉE"); pushData(); }
-        function cancelOrder(oid) { 
-            if(!confirm("Supprimer définitivement cette commande ?")) return;
-            const idx = currentRes.orders.findIndex(x => x.id === oid);
-            if(idx > -1) {
-                const o = currentRes.orders[idx];
-                o.rawItems.forEach(item => { const plat = currentRes.plats.find(p => p.id === item.id); if(plat) plat.stock += item.qte; });
-                logResEvent(currentRes, "COMMANDE SUPPRIMÉE", o); currentRes.orders.splice(idx, 1);
-                renderProOrders(); setNotif("COMMANDE SUPPRIMÉE"); pushData(); 
-            }
-        }
+        function cancelOrder(oid) { if(!confirm("Supprimer définitivement cette commande ?")) return; const idx = currentRes.orders.findIndex(x => x.id === oid); if(idx > -1) { const o = currentRes.orders[idx]; o.rawItems.forEach(item => { const plat = currentRes.plats.find(p => p.id === item.id); if(plat) plat.stock += item.qte; }); logResEvent(currentRes, "COMMANDE SUPPRIMÉE", o); currentRes.orders.splice(idx, 1); renderProOrders(); setNotif("COMMANDE SUPPRIMÉE"); pushData(); } }
         function renderResHistory() { const l = document.getElementById('res-event-log'); if(!l) return; l.innerHTML = ''; if(!currentRes.eventHistory || currentRes.eventHistory.length === 0) { l.innerHTML = '<p style="color:#888; font-size:0.8rem">Aucun événement.</p>'; return; } currentRes.eventHistory.forEach(ev => { l.innerHTML += `<div class="hist-card" style="font-size:0.75rem;"><small>${ev.date} ${ev.time}</small><br><b>${ev.status}</b> - ${ev.client}</div>`; }); }
 
-        function hasActiveOrder(livId) {
-            let active = false;
-            restaurants.forEach(res => { if(res.orders && res.orders.some(o => o.livId === livId && o.status === 'shipping')) active = true; });
-            return active;
-        }
+        function hasActiveOrder(livId) { let active = false; restaurants.forEach(res => { if(res.orders && res.orders.some(o => o.livId === livId && o.status === 'shipping')) active = true; }); return active; }
         function renderLivreurOrders() {
             const l = document.getElementById('liv-orders'); l.innerHTML = '<h3>Missions</h3>';
             const isBusy = hasActiveOrder(currentLivreur.id);
@@ -552,68 +475,59 @@
                 });
             });
         }
-        function takeOrd(rid, oid) {
-            if(hasActiveOrder(currentLivreur.id)) return setNotif("VOUS AVEZ DÉJÀ UNE LIVRAISON");
-            const r = restaurants.find(x=>x.id===rid); const o = r.orders.find(x=>x.id===oid);
-            o.status = 'shipping'; o.livId = currentLivreur.id; o.livName = currentLivreur.name;
-            logResEvent(r, `PRISE PAR LIVREUR (${currentLivreur.name})`, o);
-            setNotif("COMMANDE RÉCUPÉRÉE"); renderLivreurOrders(); pushData();
-        }
-        function ignoreOrd(oid) { 
-            const storageKey = `koul_hidden_orders_${currentLivreur.id}`;
-            let myHiddenOrders = JSON.parse(localStorage.getItem(storageKey) || '[]');
-            myHiddenOrders.push(oid); 
-            localStorage.setItem(storageKey, JSON.stringify(myHiddenOrders));
-            renderLivreurOrders(); setNotif("COMMANDE MASQUÉE"); 
-        }
+        function takeOrd(rid, oid) { if(hasActiveOrder(currentLivreur.id)) return setNotif("VOUS AVEZ DÉJÀ UNE LIVRAISON"); const r = restaurants.find(x=>x.id===rid); const o = r.orders.find(x=>x.id===oid); o.status = 'shipping'; o.livId = currentLivreur.id; o.livName = currentLivreur.name; logResEvent(r, `PRISE PAR LIVREUR (${currentLivreur.name})`, o); setNotif("COMMANDE RÉCUPÉRÉE"); renderLivreurOrders(); pushData(); }
+        function ignoreOrd(oid) { const storageKey = `koul_hidden_orders_${currentLivreur.id}`; let myHiddenOrders = JSON.parse(localStorage.getItem(storageKey) || '[]'); myHiddenOrders.push(oid); localStorage.setItem(storageKey, JSON.stringify(myHiddenOrders)); renderLivreurOrders(); setNotif("COMMANDE MASQUÉE"); }
         function openValPin(rid, oid) { pendingResId = rid; pendingOrderId = oid; deliveryTempPin = ""; document.getElementById('delivery-pin-view').innerText = ""; document.getElementById('delivery-validation-container').style.display = 'block'; }
         function closeDeliveryPin() { document.getElementById('delivery-validation-container').style.display = 'none'; }
         function confirmDelivery() {
             const r = restaurants.find(x=>x.id===pendingResId); const idx = r.orders.findIndex(x=>x.id===pendingOrderId); const o = r.orders[idx];
             if(deliveryTempPin === o.pin) {
-                const final = r.orders.splice(idx, 1)[0];
-                logResEvent(r, `LIVRÉE PAR ${currentLivreur ? currentLivreur.name : 'PRO'}`, final);
-                if(currentLivreur) { 
-                    if(!currentLivreur.history) currentLivreur.history = []; 
-                    const now = new Date();
-                    currentLivreur.history.push({ resName: r.name, date: now.toLocaleDateString(), time: String(now.getHours()).padStart(2, '0') + ":" + String(now.getMinutes()).padStart(2, '0') }); 
-                }
+                const final = r.orders.splice(idx, 1)[0]; logResEvent(r, `LIVRÉE PAR ${currentLivreur ? currentLivreur.name : 'PRO'}`, final);
+                if(currentLivreur) { if(!currentLivreur.history) currentLivreur.history = []; const now = new Date(); currentLivreur.history.push({ resName: r.name, date: now.toLocaleDateString(), time: String(now.getHours()).padStart(2, '0') + ":" + String(now.getMinutes()).padStart(2, '0') }); }
                 setNotif("LIVRÉ !"); pushData(); closeDeliveryPin(); if(currentLivreur) { renderLivreurOrders(); renderLivreurHistory(); } if(currentRes) { renderProOrders(); renderResHistory(); }
             } else { vibrate([50, 50]); setNotif("CODE INCORRECT"); }
         }
-        function renderLivreurHistory() { 
-            const l = document.getElementById('liv-hist'); l.innerHTML = '<h4>Historique</h4>'; 
-            if(currentLivreur.history) {
-                [...currentLivreur.history].reverse().forEach(h => {
-                    l.innerHTML += `<div style="font-size:0.75rem; background:#1a1a1a; padding:8px; margin-bottom:5px; border-left: 3px solid #28a745;"><b>${h.resName}</b><br><small>${h.date} - ${h.time}</small> ✅</div>`;
-                });
-            }
-        }
+        function renderLivreurHistory() { const l = document.getElementById('liv-hist'); l.innerHTML = '<h4>Historique</h4>'; if(currentLivreur.history) { [...currentLivreur.history].reverse().forEach(h => { l.innerHTML += `<div style="font-size:0.75rem; background:#1a1a1a; padding:8px; margin-bottom:5px; border-left: 3px solid #28a745;"><b>${h.resName}</b><br><small>${h.date} - ${h.time}</small> ✅</div>`; }); } }
 
-        function init() { const grid = document.getElementById('res-grid'); grid.innerHTML = ''; restaurants.forEach(res => { grid.innerHTML += `<div class="card" onclick="openClientMenu(${res.id})"><img src="${res.img || 'https://via.placeholder.com/150'}"><br><b>${res.name}</b></div>`; }); generatePads(); }
+        function init() { const grid = document.getElementById('res-grid'); grid.innerHTML = ''; restaurants.forEach(res => { const closed = res.open === false ? '<div class="closed-badge">FERMÉ</div>' : ''; grid.innerHTML += `<div class="card" onclick="openClientMenu(${res.id})">${closed}<img src="${res.img || 'https://via.placeholder.com/150'}"><br><b>${res.name}</b></div>`; }); generatePads(); }
         function openClientMenu(rid) { currentRes = restaurants.find(x=>x.id===rid); showSection('view-menu-client'); document.getElementById('client-res-name').innerText = currentRes.name; renderClientPlats(); }
         function toggleZoom(img) { img.classList.toggle('zoom-image'); }
-        function renderClientPlats() { const l = document.getElementById('plats-list-client'); l.innerHTML = ''; if(currentRes.plats) currentRes.plats.forEach(p => { const qty = cart[p.id] ? cart[p.id].qte : 0; l.innerHTML += `<div style="display:flex; align-items:center; gap:10px; background:#333; padding:10px; border-radius:10px; margin-bottom:10px"><img src="${p.img}" class="img-plat-client" onclick="toggleZoom(this)"><div style="flex:1"><b>${p.n}</b><br>${p.p} DZD <br><small>Dispo: ${p.stock}</small></div><div style="display:flex; align-items:center; gap:10px"><button onclick="changeQty(${p.id}, -1)">-</button><span>${qty}</span><button onclick="changeQty(${p.id}, 1)">+</button></div></div>`; }); }
-        function changeQty(pid, d) { const p = currentRes.plats.find(x=>x.id===pid); if(d > 0 && p.stock <= (cart[pid]?.qte || 0)) return setNotif("STOCK ÉPUISÉ"); if(!cart[pid]) cart[pid] = { n:p.n, p:p.p, qte:0, id: p.id }; cart[pid].qte += d; if(cart[pid].qte <= 0) delete cart[pid]; renderClientPlats(); updateCartUI(); }
-        function updateCartUI() { const f = document.getElementById('footer-cart'), l = document.getElementById('cart-items-list'); const keys = Object.keys(cart); if(!keys.length || !document.getElementById('view-menu-client').classList.contains('active')) { f.style.display='none'; return; } f.style.display='block'; l.innerHTML = ''; let t = 0; keys.forEach(k => { t += cart[k].p * cart[k].qte; l.innerHTML += `<div>${cart[k].qte}x ${cart[k].n}</div>`; }); document.getElementById('cart-total').innerText = t; }
-        function openClientPin() { if(!document.getElementById('c-name').value) return setNotif("NOM REQUIS"); document.getElementById('client-pin-container').style.display='block'; clientTempPin=""; document.getElementById('client-pin-view').innerText=""; }
+        function renderClientPlats() { 
+            const l = document.getElementById('plats-list-client'); l.innerHTML = ''; 
+            const isOpen = currentRes.open !== false;
+            if(currentRes.plats) currentRes.plats.forEach(p => { 
+                const qty = cart[p.id] ? cart[p.id].qte : 0; 
+                l.innerHTML += `<div style="display:flex; align-items:center; gap:10px; background:#333; padding:10px; border-radius:10px; margin-bottom:10px"><img src="${p.img}" class="img-plat-client" onclick="toggleZoom(this)"><div style="flex:1"><b>${p.n}</b><br>${p.p} DZD <br><small>Dispo: ${p.stock}</small></div><div style="display:flex; align-items:center; gap:10px">${isOpen ? `<button onclick="changeQty(${p.id}, -1)">-</button><span>${qty}</span><button onclick="changeQty(${p.id}, 1)">+</button>` : ''}</div></div>`; 
+            }); 
+        }
+        function changeQty(pid, d) { if(currentRes.open === false) return; const p = currentRes.plats.find(x=>x.id===pid); if(d > 0 && p.stock <= (cart[pid]?.qte || 0)) return setNotif("STOCK ÉPUISÉ"); if(!cart[pid]) cart[pid] = { n:p.n, p:p.p, qte:0, id: p.id }; cart[pid].qte += d; if(cart[pid].qte <= 0) delete cart[pid]; renderClientPlats(); updateCartUI(); }
+        function updateCartUI() { 
+            const f = document.getElementById('footer-cart'), l = document.getElementById('cart-items-list'); 
+            const keys = Object.keys(cart); 
+            if(!keys.length || !document.getElementById('view-menu-client').classList.contains('active')) { f.style.display='none'; return; } 
+            f.style.display='block'; 
+            
+            const isOpen = currentRes.open !== false;
+            document.getElementById('footer-form-client').style.display = isOpen ? 'block' : 'none';
+            document.getElementById('footer-closed-msg').style.display = isOpen ? 'none' : 'block';
+
+            l.innerHTML = ''; let t = 0; keys.forEach(k => { t += cart[k].p * cart[k].qte; l.innerHTML += `<div>${cart[k].qte}x ${cart[k].n}</div>`; }); document.getElementById('cart-total').innerText = t; 
+        }
+        function openClientPin() { if(currentRes.open === false) return; if(!document.getElementById('c-name').value) return setNotif("NOM REQUIS"); document.getElementById('client-pin-container').style.display='block'; clientTempPin=""; document.getElementById('client-pin-view').innerText=""; }
         function closeClientPin() { document.getElementById('client-pin-container').style.display='none'; }
         
         function confirmClientOrder() { 
+            if(currentRes.open === false) return;
             if(clientTempPin.length < 4) return; 
             const itemsList = Object.values(cart); 
             const resIndex = restaurants.findIndex(r => r.id === currentRes.id);
             if(resIndex === -1) return;
             if(!restaurants[resIndex].orders) restaurants[resIndex].orders = []; 
-
             const orderId = Date.now();
             const order = { id: orderId, client: document.getElementById('c-name').value, tel: document.getElementById('c-tel').value, rawItems: itemsList, itemsText: itemsList.map(i => `${i.qte}x ${i.n}`).join(', '), total: document.getElementById('cart-total').innerText, pin: clientTempPin, status: 'new' }; 
-            
-            // SAUVEGARDE MULTI-SUIVI
             let tracked = JSON.parse(localStorage.getItem('koul_tracked_orders') || "[]");
             tracked.push({ resId: currentRes.id, orderId: orderId, rated: false });
             localStorage.setItem('koul_tracked_orders', JSON.stringify(tracked));
-            
             itemsList.forEach(item => { const plat = restaurants[resIndex].plats.find(p => p.id === item.id); if(plat) plat.stock -= item.qte; });
             restaurants[resIndex].orders.push(order); 
             logResEvent(restaurants[resIndex], "NOUVELLE COMMANDE", order);
@@ -624,14 +538,9 @@
         function showClearConfirm(show = true) { document.getElementById('clear-confirm-panel').style.display = show ? 'block' : 'none'; }
         function toggleSec(id) { const s = document.getElementById(id); s.style.display = (s.style.display==='block' || s.style.display==='') ? 'none' : 'block'; }
         function logoutLivreur() { currentLivreur = null; goToHome(); }
-        function exportHistory() { 
-            let content = "HISTORIQUE KOUL\n\n";
-            adminHistory.forEach(h => { content += `[${h.date} ${h.time}] ${h.type}: ${h.details}\n`; });
-            const blob = new Blob([content], { type: 'text/plain' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a'); a.href = url; a.download = `koul_log.txt`; a.click();
-        }
+        function exportHistory() { let content = "HISTORIQUE KOUL\n\n"; adminHistory.forEach(h => { content += `[${h.date} ${h.time}] ${h.type}: ${h.details}\n`; }); const blob = new Blob([content], { type: 'text/plain' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `koul_log.txt`; a.click(); }
         init();
     </script>
 </body>
 </html>
+
