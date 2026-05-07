@@ -544,21 +544,35 @@
         function closeClientPin() { document.getElementById('client-pin-container').style.display='none'; }
         
         function confirmClientOrder() { 
-            if(clientTempPin.length<4) return; 
+            if(clientTempPin.length < 4) return; 
             const itemsList = Object.values(cart); 
-            if(!currentRes.orders) currentRes.orders = []; 
+            const resIndex = restaurants.findIndex(r => r.id === currentRes.id);
+            if(resIndex === -1) return;
+
+            if(!restaurants[resIndex].orders) restaurants[resIndex].orders = []; 
 
             itemsList.forEach(item => {
-                const plat = currentRes.plats.find(p => p.id === item.id);
+                const plat = restaurants[resIndex].plats.find(p => p.id === item.id);
                 if(plat) plat.stock -= item.qte;
             });
 
-            const order = { id: Date.now(), client: document.getElementById('c-name').value, tel: document.getElementById('c-tel').value, rawItems: itemsList, itemsText: itemsList.map(i => `${i.qte}x ${i.n}`).join(', '), total: document.getElementById('cart-total').innerText, pin: clientTempPin, status: 'new' }; 
-            currentRes.orders.push(order); 
-            logResEvent(currentRes, "NOUVELLE COMMANDE", order);
+            const order = { 
+                id: Date.now(), 
+                client: document.getElementById('c-name').value, 
+                tel: document.getElementById('c-tel').value, 
+                rawItems: itemsList, 
+                itemsText: itemsList.map(i => `${i.qte}x ${i.n}`).join(', '), 
+                total: document.getElementById('cart-total').innerText, 
+                pin: clientTempPin, 
+                status: 'new' 
+            }; 
+            
+            restaurants[resIndex].orders.push(order); 
+            logResEvent(restaurants[resIndex], "NOUVELLE COMMANDE", order);
             setNotif("COMMANDE RÉUSSIE"); 
             closeClientPin(); 
             pushData(); 
+            cart = {};
             goToHome(); 
         }
 
@@ -585,3 +599,4 @@
     </script>
 </body>
 </html>
+
