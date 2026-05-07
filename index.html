@@ -23,6 +23,16 @@
         }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
+        /* Barre de Suivi Commande Client */
+        #order-tracker-bar {
+            display: none; background: #1e1e1e; border-bottom: 2px solid var(--primary);
+            padding: 10px 15px; font-size: 0.85rem; align-items: center; gap: 10px;
+            animation: slideDown 0.4s ease;
+        }
+        @keyframes slideDown { from { transform: translateY(-100%); } to { transform: translateY(0); } }
+        .status-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--primary); box-shadow: 0 0 10px var(--primary); animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.3; } 100% { opacity: 1; } }
+
         /* Zoom Image Plat */
         .img-plat-client { width: 60px; height: 60px; border-radius: 5px; object-fit: cover; transition: all 0.3s ease; cursor: pointer; z-index: 1; }
         .img-plat-client.zoom-image {
@@ -89,6 +99,15 @@
     </div>
 
     <div id="notification-bar"><span id="notif-message">BIENVENUE</span></div>
+    
+    <div id="order-tracker-bar">
+        <div class="status-dot"></div>
+        <div style="flex:1">
+            <b id="track-res-name" style="color:var(--primary)">RESTO</b>: 
+            <span id="track-status-text">Suivi de commande...</span>
+        </div>
+        <small id="track-pin" style="background:#444; padding:2px 5px; border-radius:3px"></small>
+    </div>
 
     <header>
         <h1 onclick="goToHome()" style="cursor:pointer">Koul</h1>
@@ -212,7 +231,6 @@
         let pendingResId = null, pendingOrderId = null;
         let promoMessage = "BIENVENUE";
 
-        // --- OPTIMISATION : MASQUER LE CHARGEMENT PLUS VITE ---
         db.ref('cloud_koul').on('value', (snapshot) => {
             const data = snapshot.val();
             document.getElementById('loading-screen').style.display = 'none';
@@ -222,6 +240,7 @@
                 livreurs = data.livreurs || [];
                 adminHistory = data.adminHistory || [];
                 promoMessage = data.promoMessage || "BIENVENUE";
+                
                 document.getElementById('notif-message').innerText = promoMessage;
 
                 if(currentRes) {
@@ -232,15 +251,49 @@
                     const updatedLiv = livreurs.find(l => l.id === currentLivreur.id);
                     if(updatedLiv) currentLivreur = updatedLiv;
                 }
+                
                 refreshCurrentView();
+                checkActiveOrder(); // On vérifie si le client a une commande en cours
             }
-            if(document.getElementById('view-restaurants').classList.contains('active')) { init(); }
-        }, (error) => {
-             // Si erreur ou pas de data, on débloque quand même l'écran
-             document.getElementById('loading-screen').style.display = 'none';
+            if(document.getElementById('view-restaurants').classList.contains('active')) {
+                init();
+            }
         });
 
-        // --- FONCTION MAGIQUE : COMPRESSION IMAGE ---
+        // --- NOUVEAU : SYSTEME DE SUIVI CLIENT ---
+        function checkActiveOrder() {
+            const trackData = JSON.parse(localStorage.getItem('koul_active_order'));
+            const bar = document.getElementById('order-tracker-bar');
+            
+            if(!trackData) { bar.style.display = 'none'; return; }
+
+            const res = restaurants.find(r => r.id === trackData.resId);
+            if(!res || !res.orders) { 
+                localStorage.removeItem('koul_active_order');
+                bar.style.display = 'none'; 
+                return; 
+            }
+
+            const order = res.orders.find(o => o.id === trackData.orderId);
+            if(!order) {
+                localStorage.removeItem('koul_active_order');
+                bar.style.display = 'none';
+                return;
+            }
+
+            // Mise à jour visuelle
+            bar.style.display = 'flex';
+            document.getElementById('track-res-name').innerText = res.name.toUpperCase();
+            document.getElementById('track-pin').innerText = "CODE: " + order.pin;
+            
+            let statusTxt = "En préparation...";
+            if(order.status === 'waiting') statusTxt = "Prête ! En attente d'un livreur...";
+            if(order.status === 'shipping') statusTxt = "En cours de livraison 🛵";
+            
+            document.getElementById('track-status-text').innerText = statusTxt;
+        }
+
+        // --- COMPRESSION IMAGE ---
         function compressImage(file, maxWidth, callback) {
             const reader = new FileReader();
             reader.readAsDataURL(file);
@@ -254,19 +307,9 @@
                     canvas.height = img.height * scale;
                     const ctx = canvas.getContext('2d');
                     ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                    // On compresse à 0.7 (70% de qualité) ce qui est parfait pour mobile
                     callback(canvas.toDataURL('image/jpeg', 0.7));
                 };
             };
-        }
-
-        function pushData() {
-            db.ref('cloud_koul').set({ 
-                restaurants: restaurants || [], 
-                livreurs: livreurs || [], 
-                adminHistory: adminHistory || [], 
-                promoMessage: promoMessage || "BIENVENUE"
-            });
         }
 
         function refreshCurrentView() {
@@ -292,6 +335,15 @@
                 bar.style.backgroundColor = "#000"; bar.style.color = "#ffcc00"; 
                 document.getElementById('notif-message').innerText = promoMessage;
             }, 3000);
+        }
+
+        function pushData() {
+            db.ref('cloud_koul').set({ 
+                restaurants: restaurants || [], 
+                livreurs: livreurs || [], 
+                adminHistory: adminHistory || [], 
+                promoMessage: promoMessage || "BIENVENUE"
+            });
         }
 
         function updatePromoMessage() {
@@ -347,7 +399,7 @@
 
         function goToHome() { cart = {}; currentRes = null; currentLivreur = null; showSection('view-restaurants'); init(); }
 
-        // --- ADMIN (Optimisé avec compression) ---
+        // --- ADMIN ---
         function adminCreateRes() {
             const n = document.getElementById('adm-res-n').value, c = document.getElementById('adm-res-c').value, f = document.getElementById('adm-res-img').files[0];
             if(n && c) {
@@ -362,18 +414,27 @@
                 if(f) compressImage(f, 300, add); else add('');
             }
         }
-
         function logAdminEvent(type, details) { 
             const now = new Date();
-            adminHistory.unshift({ type, details, time: String(now.getHours()).padStart(2, '0') + ":" + String(now.getMinutes()).padStart(2, '0'), date: now.toLocaleDateString() }); 
+            adminHistory.unshift({ 
+                type, 
+                details, 
+                time: String(now.getHours()).padStart(2, '0') + ":" + String(now.getMinutes()).padStart(2, '0'), 
+                date: now.toLocaleDateString() 
+            }); 
             pushData(); 
         }
-
         function logResEvent(res, status, order) { 
             if(!res.eventHistory) res.eventHistory = []; 
             const now = new Date();
             const timeStr = String(now.getHours()).padStart(2, '0') + ":" + String(now.getMinutes()).padStart(2, '0');
-            res.eventHistory.unshift({ status, client: order.client, items: order.itemsText || (order.items ? order.items.join(', ') : ''), time: timeStr, date: now.toLocaleDateString() }); 
+            res.eventHistory.unshift({ 
+                status, 
+                client: order.client, 
+                items: order.itemsText || (order.items ? order.items.join(', ') : ''), 
+                time: timeStr, 
+                date: now.toLocaleDateString() 
+            }); 
             logAdminEvent(res.name.toUpperCase(), `${status} - Client: ${order.client}`);
         }
         
@@ -383,7 +444,11 @@
         }
         function deleteRes(id) { 
             const r = restaurants.find(x => x.id === id);
-            if(confirm("Supprimer ce restaurant ?")) { logAdminEvent("SYSTEM", `Resto supprimé: ${r.name}`); restaurants = restaurants.filter(x => x.id !== id); pushData(); renderAdminResList(); } 
+            if(confirm("Supprimer ce restaurant ?")) { 
+                logAdminEvent("SYSTEM", `Resto supprimé: ${r.name}`);
+                restaurants = restaurants.filter(x => x.id !== id); 
+                pushData(); renderAdminResList(); 
+            } 
         }
 
         function renderAdminLivList() { 
@@ -392,13 +457,17 @@
         }
         function deleteLiv(id) { 
             const l = livreurs.find(x => x.id === id);
-            if(confirm("Supprimer ce livreur ?")) { logAdminEvent("SYSTEM", `Livreur supprimé: ${l.name}`); livreurs = livreurs.filter(x => x.id !== id); pushData(); renderAdminLivList(); } 
+            if(confirm("Supprimer ce livreur ?")) { 
+                logAdminEvent("SYSTEM", `Livreur supprimé: ${l.name}`);
+                livreurs = livreurs.filter(x => x.id !== id); 
+                pushData(); renderAdminLivList(); 
+            } 
         }
 
         function renderAdminHistory() { const l = document.getElementById('admin-hist-list'); l.innerHTML = ''; adminHistory.forEach(h => { l.innerHTML += `<div class="hist-card"><span class="type-tag">${h.type}</span><br><b>${h.details}</b><br><small>${h.date} ${h.time}</small></div>`; }); }
         function clearHistory() { adminHistory = []; pushData(); showClearConfirm(false); setNotif("HISTORIQUE VIDÉ"); }
 
-        // --- PRO (Optimisé avec compression) ---
+        // --- PRO ---
         function addNewPlat() {
             const nInput = document.getElementById('new-n'), pInput = document.getElementById('new-p'), sInput = document.getElementById('new-s'), imgInput = document.getElementById('new-img');
             if(nInput.value && pInput.value) {
@@ -411,7 +480,6 @@
                 if(imgInput.files[0]) compressImage(imgInput.files[0], 500, add); else add('');
             }
         }
-
         function renderProPlats() { const l = document.getElementById('manage-plats'); l.innerHTML = ''; if(currentRes.plats) currentRes.plats.forEach((p, i) => { l.innerHTML += `<div class="plat-manage-card"><img src="${p.img}" class="mini-img"><div style="flex:1"><b>${p.n}</b><br><small>${p.p} DZD</small></div><div style="display:flex; align-items:center"><input type="number" value="${p.stock}" id="stk-${i}" style="width:50px; background:#222; border:1px solid #555; color:white; padding:5px"><button class="btn-icon" onclick="updateStock(${i})">OK</button><button class="btn-icon" onclick="deletePlat(${p.id})" style="color:red">X</button></div></div>`; }); }
         function deletePlat(id) { 
             const p = currentRes.plats.find(x => x.id === id);
@@ -434,7 +502,9 @@
                     let statusText = o.status === 'new' ? 'REÇUE' : (o.status === 'waiting' ? 'PUBLIÉE' : (o.livName ? `Prise par ${o.livName}` : 'EN COURS'));
                     l.innerHTML += `<div class="order-card-pro" style="border-left: 5px solid ${statusColor}"><div style="display:flex; justify-content:space-between"><b>${o.client}</b> <small>${statusText}</small></div><small>${o.itemsText}</small><br><b>${o.total} DZD</b><div class="order-actions"><a href="tel:${o.tel}" class="btn-call">APPELER</a>${o.status === 'new' ? `<button class="btn-finish" onclick="updateOrderStatus(${i}, 'waiting')">PUBLIER</button>` : ''}<button class="btn-reject" onclick="cancelOrder(${o.id})">SUPPRIMER</button>${o.status === 'waiting' || o.status === 'shipping' ? `<button class="btn-finish" style="background:#28a745" onclick="openValPin(${currentRes.id}, ${o.id})">CLÔTURER</button>` : ''}</div></div>`;
                 });
-            } else { l.innerHTML = '<p style="text-align:center; color:#888;">Aucune commande en cours.</p>'; }
+            } else {
+                l.innerHTML = '<p style="text-align:center; color:#888;">Aucune commande en cours.</p>';
+            }
         }
         function updateOrderStatus(idx, status) { const o = currentRes.orders[idx]; o.status = status; logResEvent(currentRes, "COMMANDE PUBLIÉE", o); renderProOrders(); setNotif("COMMANDE PUBLIÉE"); pushData(); }
         
@@ -443,8 +513,12 @@
             const idx = currentRes.orders.findIndex(x => x.id === oid);
             if(idx > -1) {
                 const o = currentRes.orders[idx];
-                o.rawItems.forEach(item => { const plat = currentRes.plats.find(p => p.id === item.id); if(plat) plat.stock += item.qte; });
-                logResEvent(currentRes, "COMMANDE SUPPRIMÉE", o); currentRes.orders.splice(idx, 1);
+                o.rawItems.forEach(item => {
+                    const plat = currentRes.plats.find(p => p.id === item.id);
+                    if(plat) plat.stock += item.qte;
+                });
+                logResEvent(currentRes, "COMMANDE SUPPRIMÉE", o); 
+                currentRes.orders.splice(idx, 1);
                 renderProOrders(); setNotif("COMMANDE SUPPRIMÉE"); pushData(); 
             }
         }
@@ -454,7 +528,9 @@
         // --- LIVREUR ---
         function hasActiveOrder(livId) {
             let active = false;
-            restaurants.forEach(res => { if(res.orders && res.orders.some(o => o.livId === livId && o.status === 'shipping')) active = true; });
+            restaurants.forEach(res => {
+                if(res.orders && res.orders.some(o => o.livId === livId && o.status === 'shipping')) active = true;
+            });
             return active;
         }
 
@@ -462,12 +538,25 @@
             const l = document.getElementById('liv-orders'); l.innerHTML = '<h3>Missions</h3>';
             const isBusy = hasActiveOrder(currentLivreur.id);
             const myHiddenOrders = JSON.parse(localStorage.getItem(`koul_hidden_orders_${currentLivreur.id}`) || '[]');
+
             restaurants.forEach(res => {
                 if(res.orders) res.orders.forEach(o => {
                     if(!myHiddenOrders.includes(o.id) && (o.status === 'waiting' || (o.status === 'shipping' && o.livId === currentLivreur.id))) {
                         const canTake = !isBusy && o.status === 'waiting';
                         const isBeingShippedByMe = o.status === 'shipping' && o.livId === currentLivreur.id;
-                        l.innerHTML += `<div class="order-card-pro"><b style="color:var(--primary)">${res.name}</b><br><b>Client: ${o.client}</b><br><div class="order-actions">${canTake ? `<button class="btn-finish" onclick="takeOrd(${res.id}, ${o.id})">PRENDRE</button>` : ''}${o.status === 'waiting' ? `<button class="btn-reject" onclick="ignoreOrd(${o.id})">MASQUER</button>` : ''}${isBeingShippedByMe ? `<a href="tel:${o.tel}" class="btn-call">APPELER</a>` : ''}${isBeingShippedByMe ? `<button class="btn-finish" style="background:#28a745" onclick="openValPin(${res.id}, ${o.id})">VALIDER LIVRAISON</button>` : ''}</div>${isBusy && o.status === 'waiting' ? '<small style="color:orange">Terminez votre livraison actuelle pour en prendre une autre.</small>' : ''}</div>`;
+
+                        l.innerHTML += `
+                            <div class="order-card-pro">
+                                <b style="color:var(--primary)">${res.name}</b><br>
+                                <b>Client: ${o.client}</b><br>
+                                <div class="order-actions">
+                                    ${canTake ? `<button class="btn-finish" onclick="takeOrd(${res.id}, ${o.id})">PRENDRE</button>` : ''}
+                                    ${o.status === 'waiting' ? `<button class="btn-reject" onclick="ignoreOrd(${o.id})">MASQUER</button>` : ''}
+                                    ${isBeingShippedByMe ? `<a href="tel:${o.tel}" class="btn-call">APPELER</a>` : ''}
+                                    ${isBeingShippedByMe ? `<button class="btn-finish" style="background:#28a745" onclick="openValPin(${res.id}, ${o.id})">VALIDER LIVRAISON</button>` : ''}
+                                </div>
+                                ${isBusy && o.status === 'waiting' ? '<small style="color:orange">Terminez votre livraison actuelle pour en prendre une autre.</small>' : ''}
+                            </div>`;
                     }
                 });
             });
@@ -486,7 +575,8 @@
             let myHiddenOrders = JSON.parse(localStorage.getItem(storageKey) || '[]');
             myHiddenOrders.push(oid); 
             localStorage.setItem(storageKey, JSON.stringify(myHiddenOrders));
-            renderLivreurOrders(); setNotif("COMMANDE MASQUÉE"); 
+            renderLivreurOrders(); 
+            setNotif("COMMANDE MASQUÉE"); 
         }
 
         function openValPin(rid, oid) { pendingResId = rid; pendingOrderId = oid; deliveryTempPin = ""; document.getElementById('delivery-pin-view').innerText = ""; document.getElementById('delivery-validation-container').style.display = 'block'; }
@@ -500,7 +590,11 @@
                 if(currentLivreur) { 
                     if(!currentLivreur.history) currentLivreur.history = []; 
                     const now = new Date();
-                    currentLivreur.history.push({ resName: r.name, date: now.toLocaleDateString(), time: String(now.getHours()).padStart(2, '0') + ":" + String(now.getMinutes()).padStart(2, '0') }); 
+                    currentLivreur.history.push({
+                        resName: r.name, 
+                        date: now.toLocaleDateString(), 
+                        time: String(now.getHours()).padStart(2, '0') + ":" + String(now.getMinutes()).padStart(2, '0')
+                    }); 
                 }
                 setNotif("LIVRÉ !"); pushData(); closeDeliveryPin(); if(currentLivreur) { renderLivreurOrders(); renderLivreurHistory(); } if(currentRes) { renderProOrders(); renderResHistory(); }
             } else { vibrate([50, 50]); setNotif("CODE INCORRECT"); }
@@ -510,8 +604,12 @@
             const l = document.getElementById('liv-hist'); 
             l.innerHTML = '<h4>Historique</h4>'; 
             if(currentLivreur.history) {
-                [...currentLivreur.history].reverse().forEach(h => {
-                    l.innerHTML += `<div style="font-size:0.75rem; background:#1a1a1a; padding:8px; margin-bottom:5px; border-left: 3px solid #28a745;"><b>${h.resName}</b><br><small>${h.date} - ${h.time}</small> ✅</div>`;
+                const sortedHist = [...currentLivreur.history].reverse();
+                sortedHist.forEach(h => {
+                    l.innerHTML += `<div style="font-size:0.75rem; background:#1a1a1a; padding:8px; margin-bottom:5px; border-left: 3px solid #28a745;">
+                        <b>${h.resName}</b><br>
+                        <small>${h.date} - ${h.time}</small> ✅
+                    </div>`;
                 });
             }
         }
@@ -519,7 +617,10 @@
         // --- CLIENT ---
         function init() { const grid = document.getElementById('res-grid'); grid.innerHTML = ''; restaurants.forEach(res => { grid.innerHTML += `<div class="card" onclick="openClientMenu(${res.id})"><img src="${res.img || 'https://via.placeholder.com/150'}"><br><b>${res.name}</b></div>`; }); generatePads(); }
         function openClientMenu(rid) { currentRes = restaurants.find(x=>x.id===rid); showSection('view-menu-client'); document.getElementById('client-res-name').innerText = currentRes.name; renderClientPlats(); }
-        function toggleZoom(img) { img.classList.toggle('zoom-image'); }
+        
+        function toggleZoom(img) {
+            img.classList.toggle('zoom-image');
+        }
 
         function renderClientPlats() { const l = document.getElementById('plats-list-client'); l.innerHTML = ''; if(currentRes.plats) currentRes.plats.forEach(p => { const qty = cart[p.id] ? cart[p.id].qte : 0; l.innerHTML += `<div style="display:flex; align-items:center; gap:10px; background:#333; padding:10px; border-radius:10px; margin-bottom:10px"><img src="${p.img}" class="img-plat-client" onclick="toggleZoom(this)"><div style="flex:1"><b>${p.n}</b><br>${p.p} DZD <br><small>Dispo: ${p.stock}</small></div><div style="display:flex; align-items:center; gap:10px"><button onclick="changeQty(${p.id}, -1)">-</button><span>${qty}</span><button onclick="changeQty(${p.id}, 1)">+</button></div></div>`; }); }
         
@@ -533,14 +634,37 @@
             const itemsList = Object.values(cart); 
             const resIndex = restaurants.findIndex(r => r.id === currentRes.id);
             if(resIndex === -1) return;
+
             if(!restaurants[resIndex].orders) restaurants[resIndex].orders = []; 
 
-            itemsList.forEach(item => { const plat = restaurants[resIndex].plats.find(p => p.id === item.id); if(plat) plat.stock -= item.qte; });
-            const order = { id: Date.now(), client: document.getElementById('c-name').value, tel: document.getElementById('c-tel').value, rawItems: itemsList, itemsText: itemsList.map(i => `${i.qte}x ${i.n}`).join(', '), total: document.getElementById('cart-total').innerText, pin: clientTempPin, status: 'new' }; 
+            itemsList.forEach(item => {
+                const plat = restaurants[resIndex].plats.find(p => p.id === item.id);
+                if(plat) plat.stock -= item.qte;
+            });
+
+            const orderId = Date.now();
+            const order = { 
+                id: orderId, 
+                client: document.getElementById('c-name').value, 
+                tel: document.getElementById('c-tel').value, 
+                rawItems: itemsList, 
+                itemsText: itemsList.map(i => `${i.qte}x ${i.n}`).join(', '), 
+                total: document.getElementById('cart-total').innerText, 
+                pin: clientTempPin, 
+                status: 'new' 
+            }; 
             
             restaurants[resIndex].orders.push(order); 
             logResEvent(restaurants[resIndex], "NOUVELLE COMMANDE", order);
-            setNotif("COMMANDE RÉUSSIE"); closeClientPin(); pushData(); cart = {}; goToHome(); 
+            
+            // SAUVEGARDE POUR LE SUIVI CLIENT
+            localStorage.setItem('koul_active_order', JSON.stringify({ resId: currentRes.id, orderId: orderId }));
+
+            setNotif("COMMANDE RÉUSSIE"); 
+            closeClientPin(); 
+            pushData(); 
+            cart = {};
+            goToHome(); 
         }
 
         function showClearConfirm(show = true) { document.getElementById('clear-confirm-panel').style.display = show ? 'block' : 'none'; }
@@ -549,10 +673,15 @@
         
         function exportHistory() { 
             let content = "HISTORIQUE KOUL\n\n";
-            adminHistory.forEach(h => { content += `[${h.date} ${h.time}] ${h.type}: ${h.details}\n`; });
+            adminHistory.forEach(h => {
+                content += `[${h.date} ${h.time}] ${h.type}: ${h.details}\n`;
+            });
             const blob = new Blob([content], { type: 'text/plain' });
             const url = URL.createObjectURL(blob);
-            const a = document.createElement('a'); a.href = url; a.download = `koul_log.txt`; a.click();
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `koul_log.txt`;
+            a.click();
         }
 
         init();
