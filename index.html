@@ -352,12 +352,44 @@
         function deletePlat(id) { currentRes.plats = currentRes.plats.filter(x=>x.id!==id); pushData(); renderProPlats(); }
 
         function renderProOrders() {
-            const l = document.getElementById('orders-list-pro'); l.innerHTML = '<h3>Commandes</h3>';
-            if(currentRes.orders) currentRes.orders.forEach((o, i) => {
-                l.innerHTML += `<div class="order-card-pro"><b>${o.client}</b> (${o.status})<br><small>${o.itemsText}</small><br><b>${o.total} DZD</b><div class="order-actions"><a href="tel:${o.tel}" class="btn-call">APPELER</a>${o.status==='new'?`<button onclick="updateStatus(${i},'waiting')">PUBLIER</button>`:''}<button onclick="openValPin(${currentRes.id},${o.id})" style="background:green">LIVRÉ</button></div></div>`;
-            });
+            const l = document.getElementById('orders-list-pro'); 
+            l.innerHTML = '<h3>Commandes</h3>';
+            if(currentRes.orders && currentRes.orders.length > 0) {
+                currentRes.orders.forEach((o, i) => {
+                    l.innerHTML += `
+                        <div class="order-card-pro">
+                            <div style="display:flex; justify-content:space-between">
+                                <b>${o.client}</b>
+                                <button onclick="deleteOrd(${i})" style="color:red; border:none; background:none; font-weight:bold">X</button>
+                            </div>
+                            <small>${o.itemsText}</small><br>
+                            <b>Statut: ${o.status === 'new' ? 'Nouveau' : o.status === 'waiting' ? 'En attente livreur' : 'En cours'}</b><br>
+                            <b>${o.total} DZD</b>
+                            <div class="order-actions">
+                                <a href="tel:${o.tel}" class="btn-call">APPELER</a>
+                                ${o.status === 'new' ? `<button class="btn-finish" onclick="updateStatus(${i},'waiting')">PUBLIER</button>` : ''}
+                                <button class="btn-finish" style="background:#28a745" onclick="openValPin(${currentRes.id},${o.id})">VALIDER LIVRAISON</button>
+                            </div>
+                        </div>`;
+                });
+            } else {
+                l.innerHTML += '<p style="font-style:italic; color:#888">Aucune commande en cours.</p>';
+            }
         }
-        function updateStatus(i, s) { currentRes.orders[i].status = s; pushData(); }
+        
+        function updateStatus(i, s) { 
+            currentRes.orders[i].status = s; 
+            pushData(); 
+            setNotif("COMMANDE PUBLIÉE");
+        }
+
+        function deleteOrd(i) {
+            if(confirm("Supprimer cette commande ?")) {
+                currentRes.orders.splice(i, 1);
+                pushData();
+                setNotif("COMMANDE SUPPRIMÉE");
+            }
+        }
 
         function openValPin(rid, oid) { pendingResId=rid; pendingOrderId=oid; deliveryTempPin=""; document.getElementById('delivery-pin-view').innerText=""; document.getElementById('delivery-validation-container').style.display='block'; }
         function closeDeliveryPin() { document.getElementById('delivery-validation-container').style.display='none'; }
@@ -414,6 +446,7 @@
         function closeClientPin() { document.getElementById('client-pin-container').style.display='none'; }
         function confirmClientOrder() {
             const items = Object.values(cart);
+            if(!currentRes.orders) currentRes.orders = [];
             currentRes.orders.push({id:Date.now(), client:document.getElementById('c-name').value, tel:document.getElementById('c-tel').value, itemsText:items.map(i=>`${i.qte}x ${i.n}`).join(', '), total:document.getElementById('cart-total').innerText, pin:clientTempPin, status:'new'});
             items.forEach(i => { const p = currentRes.plats.find(x=>x.id===i.id); if(p) p.stock-=i.qte; });
             pushData(); closeClientPin(); goToHome(); setNotif("COMMANDE RÉUSSIE");
