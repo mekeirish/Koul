@@ -1,119 +1,975 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-
     <link rel="manifest" href="manifest.json">
-
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Koul - Pro & Admin</title>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-database-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-messaging-compat.js"></script>
+    
+    <!-- Google Maps API -->
+    <script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyB41DRUbKWJHPxaFjMAwdrzWzbVKartNGg&libraries=places&callback=initMap"></script>
+    
     <style>
-        :root { --primary: #ffcc00; --bg: #121212; --card-bg: #1e1e1e; --text: #ffffff; }
-        body { background-color: #2c2c2c; color: var(--text); font-family: 'Segoe UI', Roboto, sans-serif; margin: 0; padding-bottom: 120px; transition: background-color 0.5s ease; overflow-x: hidden; }
+        /* Variables de thème */
+        :root {
+            /* Thème Dark (VRAI DARK) */
+            --bg-dark: #0d1117;
+            --card-bg-dark: #161b22;
+            --text-dark: #f0f6fc;
+            --primary-dark: #ffcc00;
+            --shadow-light-dark: #1c2128;
+            --shadow-dark-dark: #010409;
+            --border-dark: #30363d;
+            --accent-dark: #21262d;
+            
+            /* Thème Light (Neumorphism) */
+            --bg-light: #f0f3f7;
+            --card-bg-light: #f0f3f7;
+            --text-light: #1a202c;
+            --primary-light: #ffcc00;
+            --shadow-light-light: #ffffff;
+            --shadow-dark-light: #cbd5e0;
+            --border-light: #e2e8f0;
+            --accent-light: #e8f0fe;
+        }
+
+        /* Thème actif par défaut */
+        [data-theme="dark"] {
+            --bg: var(--bg-dark);
+            --card-bg: var(--card-bg-dark);
+            --text: var(--text-dark);
+            --primary: var(--primary-dark);
+            --shadow-light: var(--shadow-light-dark);
+            --shadow-dark: var(--shadow-dark-dark);
+            --border: var(--border-dark);
+            --accent: var(--accent-dark);
+        }
+
+        [data-theme="light"] {
+            --bg: var(--bg-light);
+            --card-bg: var(--card-bg-light);
+            --text: var(--text-light);
+            --primary: var(--primary-light);
+            --shadow-light: var(--shadow-light-light);
+            --shadow-dark: var(--shadow-dark-light);
+            --border: var(--border-light);
+            --accent: var(--accent-light);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body { 
+            background: var(--bg);
+            color: var(--text); 
+            font-family: 'Segoe UI', Roboto, sans-serif; 
+            margin: 0; 
+            padding-bottom: 120px; 
+            transition: all 0.3s ease; 
+            overflow-x: hidden;
+            position: relative;
+            min-height: 100vh;
+        }
+
+        /* Bouton toggle thème */
+        .theme-toggle {
+            position: fixed;
+            top: 70px;
+            right: 80px;
+            width: 50px;
+            height: 50px;
+            background: var(--card-bg);
+            border-radius: 25px;
+            border: 2px solid var(--border);
+            box-shadow: 
+                6px 6px 12px var(--shadow-dark),
+                -6px -6px 12px var(--shadow-light);
+            cursor: pointer;
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+        }
+
+        .theme-toggle:hover {
+            transform: scale(1.1);
+            box-shadow: 
+                8px 8px 16px var(--shadow-dark),
+                -8px -8px 16px var(--shadow-light);
+        }
+
+        .theme-toggle:active {
+            transform: scale(0.95);
+            box-shadow: 
+                inset 2px 2px 4px var(--shadow-dark),
+                inset -2px -2px 4px var(--shadow-light);
+        }
+
+        .theme-toggle-icon {
+            font-size: 24px;
+            transition: all 0.3s ease;
+        }
 
         /* Écran de chargement */
         #loading-screen {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
-            background: #000; display: flex; flex-direction: column; 
+            background: var(--bg);
+            display: flex; flex-direction: column; 
             align-items: center; justify-content: center; z-index: 9999;
         }
         .spinner {
-            width: 50px; height: 50px; border: 5px solid #333; 
-            border-top: 5px solid var(--primary); border-radius: 50%; 
-            animation: spin 1s linear infinite; margin-bottom: 20px;
+            width: 60px; height: 60px; 
+            background: var(--card-bg);
+            border-radius: 50%;
+            box-shadow: 
+                8px 8px 16px var(--shadow-dark),
+                -8px -8px 16px var(--shadow-light),
+                inset 2px 2px 4px var(--shadow-dark),
+                inset -2px -2px 4px var(--shadow-light);
+            animation: spin 1s linear infinite; 
+            margin-bottom: 20px;
+            position: relative;
+        }
+        .spinner::before {
+            content: '';
+            position: absolute;
+            top: 5px;
+            left: 5px;
+            right: 5px;
+            bottom: 5px;
+            background: var(--primary);
+            border-radius: 50%;
+            box-shadow: inset 2px 2px 4px rgba(0,0,0,0.2);
         }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-        /* Barre de Suivi Multi-Commandes */
-        #order-tracker-container {
-            display: none; background: #1e1e1e; border-bottom: 2px solid var(--primary);
-            max-height: 150px; overflow-y: auto; position: sticky; top: 55px; z-index: 3999;
-        }
-        .tracker-line {
-            padding: 10px 15px; border-bottom: 1px solid #333; display: flex; align-items: center; gap: 10px; font-size: 0.8rem;
-        }
-        .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--primary); box-shadow: 0 0 8px var(--primary); animation: pulse 1.5s infinite; }
-        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.3; } 100% { opacity: 1; } }
-
-        /* Système de Notation */
-        #rating-modal {
-            display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            background: #1a1a1a; padding: 25px; border-radius: 20px; border: 2px solid var(--primary);
-            z-index: 6000; width: 280px; text-align: center; box-shadow: 0 0 50px rgba(0,0,0,0.9);
-        }
-        .stars { color: #555; font-size: 1.5rem; cursor: pointer; margin: 10px 0; display: flex; justify-content: center; gap: 5px; }
-        .stars span.active { color: var(--primary); text-shadow: 0 0 10px var(--primary); }
-
-        /* Zoom Image Plat */
-        .img-plat-client { width: 60px; height: 60px; border-radius: 5px; object-fit: cover; transition: all 0.3s ease; cursor: pointer; z-index: 1; }
-        .img-plat-client.zoom-image {
-            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            width: 90vw; height: auto; max-height: 80vh; border-radius: 15px;
-            z-index: 5000; box-shadow: 0 0 100px rgba(0,0,0,0.9);
-            outline: 5000px solid rgba(0,0,0,0.8);
+        /* Mode hors-ligne */
+        #offline-indicator {
+            position: fixed; top: 55px; left: 0; right: 0; 
+            background: var(--card-bg);
+            color: var(--text);
+            padding: 10px; text-align: center; 
+            z-index: 4000; display: none; font-weight: bold;
+            box-shadow: 
+                4px 4px 8px var(--shadow-dark),
+                -4px -4px 8px var(--shadow-light);
+            border: 1px solid var(--border);
         }
 
+        /* Barre de notification */
         #notification-bar {
-            width: 100%; min-height: 55px; background-color: #000; display: flex; align-items: center; 
-            justify-content: center; position: sticky; top: 0; z-index: 4000; border-bottom: 3px solid var(--primary);
-            color: var(--primary); font-weight: bold; text-align: center; padding: 5px 15px; box-sizing: border-box;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.5); font-size: 1rem; text-transform: uppercase;
+            width: 100%; min-height: 55px; 
+            background: var(--card-bg);
+            display: flex; align-items: center; 
+            justify-content: center; 
+            position: sticky; top: 0; z-index: 4000; 
+            border-bottom: 2px solid var(--border);
+            color: var(--text);
+            font-weight: bold; 
+            text-align: center; 
+            padding: 5px 15px; 
+            box-shadow: 
+                4px 4px 8px var(--shadow-dark),
+                -4px -4px 8px var(--shadow-light);
         }
 
-        header { padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; }
-        .btn-pro-header { background-color: var(--primary); color: #000; border: none; padding: 8px 15px; border-radius: 5px; font-weight: bold; cursor: pointer; }
+        header { 
+            padding: 15px 20px; 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center;
+            background: var(--card-bg);
+            border-bottom: 2px solid var(--border);
+            box-shadow: 
+                4px 4px 8px var(--shadow-dark),
+                -4px -4px 8px var(--shadow-light);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
 
+        .btn-pro-header { 
+            background: var(--card-bg);
+            color: var(--text); 
+            border: 2px solid var(--border);
+            padding: 10px 18px; 
+            border-radius: 20px; 
+            font-weight: bold; 
+            cursor: pointer;
+            box-shadow: 
+                4px 4px 8px var(--shadow-dark),
+                -4px -4px 8px var(--shadow-light);
+            transition: all 0.2s ease;
+            font-size: 14px;
+        }
+
+        .btn-pro-header:hover {
+            transform: translateY(-2px);
+            box-shadow: 
+                8px 8px 16px var(--shadow-dark),
+                -8px -8px 16px var(--shadow-light);
+        }
+
+        .btn-pro-header:active {
+            transform: translateY(0);
+            box-shadow: 
+                4px 4px 8px var(--shadow-dark),
+                -4px -4px 8px var(--shadow-light),
+                inset 2px 2px 4px var(--shadow-dark);
+        }
+
+        /* Cartes neumorphiques */
+        .card { 
+            background: var(--card-bg);
+            border-radius: 20px; 
+            padding: 15px; 
+            text-align: center; 
+            cursor: pointer; 
+            position: relative;
+            box-shadow: 
+                8px 8px 16px var(--shadow-dark),
+                -8px -8px 16px var(--shadow-light);
+            transition: all 0.3s ease;
+            border: 1px solid var(--border);
+        }
+
+        .card:hover {
+            transform: translateY(-4px);
+            box-shadow: 
+                12px 12px 24px var(--shadow-dark),
+                -12px -12px 24px var(--shadow-light);
+        }
+
+        .card img { 
+            width: 100%; 
+            height: 90px; 
+            object-fit: cover; 
+            border-radius: 15px; 
+            margin-bottom: 10px;
+            box-shadow: 
+                4px 4px 8px var(--shadow-dark),
+                -4px -4px 8px var(--shadow-light);
+        }
+
+        /* Dashboard box */
+        .dashboard-box { 
+            background: var(--card-bg);
+            border-radius: 25px; 
+            padding: 25px; 
+            box-shadow: 
+                12px 12px 24px var(--shadow-dark),
+                -12px -12px 24px var(--shadow-light);
+            border: 1px solid var(--border);
+        }
+
+        /* Input boxes neumorphiques */
+        .input-box { 
+            width: 100%; 
+            padding: 15px; 
+            margin-bottom: 12px; 
+            background: var(--card-bg);
+            color: var(--text); 
+            border: 1px solid var(--border);
+            border-radius: 15px; 
+            box-shadow: 
+                inset 4px 4px 8px var(--shadow-dark),
+                inset -4px -4px 8px var(--shadow-light);
+            transition: all 0.2s ease;
+        }
+
+        .input-box:focus {
+            outline: none;
+            box-shadow: 
+                inset 6px 6px 12px var(--shadow-dark),
+                inset -6px -6px 12px var(--shadow-light),
+                0 0 0 2px var(--primary);
+        }
+
+        /* Boutons neumorphiques */
+        .btn-neo {
+            background: var(--card-bg);
+            color: var(--text);
+            border: 1px solid var(--border);
+            padding: 12px 20px;
+            border-radius: 15px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 
+                6px 6px 12px var(--shadow-dark),
+                -6px -6px 12px var(--shadow-light);
+            transition: all 0.2s ease;
+        }
+
+        .btn-neo:hover {
+            transform: translateY(-2px);
+            box-shadow: 
+                8px 8px 16px var(--shadow-dark),
+                -8px -8px 16px var(--shadow-light);
+        }
+
+        .btn-neo:active {
+            transform: translateY(0);
+            box-shadow: 
+                4px 4px 8px var(--shadow-dark),
+                -4px -4px 8px var(--shadow-light),
+                inset 2px 2px 4px var(--shadow-dark);
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: #000;
+        }
+
+        .btn-success {
+            background: #48bb78;
+            color: white;
+        }
+
+        .btn-danger {
+            background: #f56565;
+            color: white;
+        }
+
+        /* Numpad neumorphique - Style téléphone */
         .numpad-container { 
-            display: none; padding: 25px; background: #1a1a1a; border: 2px solid var(--primary); text-align: center; 
-            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 3000; border-radius: 20px; 
-            box-shadow: 0 0 40px rgba(0,0,0,0.9); width: 280px;
+            display: none; 
+            padding: 25px; 
+            background: var(--card-bg);
+            border: 2px solid var(--border);
+            text-align: center; 
+            position: fixed; 
+            top: 50%; left: 50%; 
+            transform: translate(-50%, -50%); 
+            z-index: 3000; 
+            border-radius: 25px; 
+            box-shadow: 
+                20px 20px 40px var(--shadow-dark),
+                -20px -20px 40px var(--shadow-light);
+            width: 300px;
+            max-width: 90vw;
         }
-        .pin-display { background: #000; color: var(--primary); font-size: 1.8rem; padding: 15px; border-radius: 12px; margin-bottom: 20px; letter-spacing: 8px; height: 40px; display: flex; align-items: center; justify-content: center; border: 1px solid #333; }
-        .numpad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; }
-        .num-btn { background: #333; color: white; border: 1px solid #444; width: 65px; height: 65px; border-radius: 50%; font-size: 1.4rem; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; }
-        .num-btn:active { background: var(--primary); color: #000; }
 
-        .container { padding: 15px; }
-        .grid-container { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; }
-        .card { background-color: #3d3d3d; border-radius: 12px; padding: 10px; text-align: center; cursor: pointer; border: 1px solid #444; position: relative; }
-        .card img { width: 100%; height: 80px; object-fit: cover; border-radius: 8px; margin-bottom: 5px; }
-        .closed-badge { position: absolute; top: 10px; left: 10px; background: red; color: white; padding: 2px 5px; border-radius: 4px; font-size: 0.7rem; font-weight: bold; }
+        .pin-display { 
+            background: var(--accent);
+            color: var(--text); 
+            font-size: 1.8rem; 
+            padding: 15px; 
+            border-radius: 15px; 
+            margin-bottom: 20px; 
+            letter-spacing: 8px; 
+            height: 50px; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            border: 2px solid var(--border);
+            box-shadow: 
+                inset 4px 4px 8px var(--shadow-dark),
+                inset -4px -4px 8px var(--shadow-light);
+            font-family: 'Courier New', monospace;
+        }
 
-        .dashboard-box { background-color: rgba(30, 30, 30, 0.9); border-radius: 15px; padding: 20px; border: 1px solid var(--primary); }
-        .btn-menu-pro { width: 100%; background-color: #444; color: white; border: 1px solid #555; padding: 15px; margin-top: 10px; border-radius: 8px; font-weight: bold; display: flex; justify-content: space-between; align-items: center; }
-        .sub-section { display: none; margin-top: 5px; padding: 15px; background: #252525; border-radius: 8px; border-left: 3px solid var(--primary); }
-        .input-box { width: 100%; padding: 12px; margin-bottom: 10px; background:#333; color:white; border:1px solid #444; border-radius:5px; box-sizing: border-box; }
+        .numpad {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            margin-bottom: 15px;
+        }
 
-        .hist-card { background: #1a1a1a; border-radius: 8px; padding: 12px; margin-bottom: 10px; font-size: 0.8rem; border-left: 4px solid var(--primary); }
-        .type-tag { font-size: 0.65rem; padding: 2px 5px; border-radius: 3px; background: #333; margin-bottom: 5px; display: inline-block; }
+        .num-btn { 
+            background: var(--card-bg);
+            color: var(--text); 
+            border: 2px solid var(--border);
+            width: 70px; height: 70px; 
+            border-radius: 50%; 
+            font-size: 1.8rem; 
+            font-weight: bold; 
+            cursor: pointer; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center;
+            box-shadow: 
+                6px 6px 12px var(--shadow-dark),
+                -6px -6px 12px var(--shadow-light);
+            transition: all 0.15s ease;
+            margin: 0 auto;
+        }
 
-        .btn-icon { background: #333; border: 1px solid #555; color: white; padding: 5px 10px; border-radius: 5px; cursor: pointer; margin-left: 5px; }
-        .plat-manage-card { display: flex; align-items: center; gap: 10px; background: #333; padding: 10px; border-radius: 8px; margin-bottom: 8px; }
-        .mini-img { width: 50px; height: 50px; border-radius: 5px; object-fit: cover; }
+        .num-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 
+                8px 8px 16px var(--shadow-dark),
+                -8px -8px 16px var(--shadow-light);
+            background: var(--primary);
+            color: #000;
+        }
 
-        .order-card-pro { background: #333; padding: 15px; border-radius: 8px; margin-bottom: 10px; border: 1px solid #444; }
-        .order-actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
-        .btn-finish { background: #28a745; color: white; border: none; padding: 10px; border-radius: 5px; flex: 1; font-weight: bold; cursor: pointer; }
-        .btn-reject { background: #cc0000; color: white; border: none; padding: 10px; border-radius: 5px; flex: 1; font-weight: bold; cursor: pointer; }
-        .btn-call { background: #007bff; color: white; border: none; padding: 10px; border-radius: 5px; flex: 1; font-weight: bold; cursor: pointer; text-decoration: none; text-align: center; }
+        .num-btn:active {
+            transform: translateY(0);
+            box-shadow: 
+                inset 3px 3px 6px var(--shadow-dark),
+                inset -3px -3px 6px var(--shadow-light);
+        }
+
+        .num-btn.clear {
+            background: #f56565;
+            color: white;
+            font-size: 1.4rem;
+        }
+
+        .num-btn.ok {
+            background: #48bb78;
+            color: white;
+            font-size: 1.4rem;
+        }
+
+        .num-btn.clear:hover {
+            background: #e53e3e;
+        }
+
+        .num-btn.ok:hover {
+            background: #38a169;
+        }
+
+        /* Container */
+        .container { 
+            padding: 20px; 
+            position: relative;
+            z-index: 2;
+        }
+
+        .grid-container { 
+            display: grid; 
+            grid-template-columns: repeat(2, 1fr); 
+            gap: 20px; 
+        }
+
+        /* Statistiques */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background: var(--card-bg);
+            padding: 20px;
+            border-radius: 20px;
+            text-align: center;
+            box-shadow: 
+                6px 6px 12px var(--shadow-dark),
+                -6px -6px 12px var(--shadow-light);
+            border: 1px solid var(--border);
+        }
+
+        .stat-number {
+            font-size: 2rem;
+            font-weight: bold;
+            color: var(--primary);
+        }
+
+        .stat-label {
+            font-size: 0.8rem;
+            color: var(--text);
+            margin-top: 5px;
+            opacity: 0.8;
+        }
+
+        /* Gestion de validité */
+        .validity-container {
+            background: var(--card-bg);
+            padding: 20px;
+            border-radius: 20px;
+            margin-bottom: 15px;
+            box-shadow: 
+                6px 6px 12px var(--shadow-dark),
+                -6px -6px 12px var(--shadow-light);
+            border: 1px solid var(--border);
+        }
+
+        .validity-input {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .validity-input input {
+            flex: 1;
+        }
+
+        .validity-input span {
+            font-weight: bold;
+            color: var(--primary);
+        }
+
+        .validity-status {
+            padding: 10px;
+            border-radius: 10px;
+            text-align: center;
+            font-weight: bold;
+            margin-top: 10px;
+        }
+
+        .validity-active {
+            background: #48bb78;
+            color: white;
+            box-shadow: 
+                inset 2px 2px 4px rgba(0,0,0,0.2),
+                2px 2px 4px var(--shadow-dark);
+        }
+
+        .validity-expired {
+            background: #f56565;
+            color: white;
+            box-shadow: 
+                inset 2px 2px 4px rgba(0,0,0,0.2),
+                2px 2px 4px var(--shadow-dark);
+        }
+
+        /* Géolocalisation */
+        .location-info {
+            background: var(--card-bg);
+            padding: 15px;
+            border-radius: 15px;
+            margin-bottom: 15px;
+            box-shadow: 
+                4px 4px 8px var(--shadow-dark),
+                -4px -4px 8px var(--shadow-light);
+            border: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .location-icon {
+            color: var(--primary);
+            font-size: 1.5rem;
+        }
+
+        .location-text {
+            flex: 1;
+        }
+
+        .distance-info {
+            background: var(--card-bg);
+            padding: 10px;
+            border-radius: 10px;
+            margin: 10px 0;
+            box-shadow: 
+                inset 2px 2px 4px var(--shadow-dark),
+                inset -2px -2px 4px var(--shadow-light);
+            border: 1px solid var(--border);
+        }
+
+        /* Cartes de commande */
+        .order-card-pro { 
+            background: var(--card-bg);
+            padding: 18px; 
+            border-radius: 20px; 
+            margin-bottom: 15px; 
+            border: 1px solid var(--border);
+            box-shadow: 
+                6px 6px 12px var(--shadow-dark),
+                -6px -6px 12px var(--shadow-light);
+        }
+
+        .order-actions { 
+            display: flex; 
+            gap: 10px; 
+            margin-top: 15px; 
+            flex-wrap: wrap; 
+        }
+
+        /* Modal de notation */
+        #rating-modal {
+            display: none; 
+            position: fixed; 
+            top: 50%; left: 50%; 
+            transform: translate(-50%, -50%);
+            background: var(--card-bg);
+            padding: 30px; 
+            border-radius: 25px; 
+            border: 2px solid var(--border);
+            z-index: 6000; 
+            width: 320px; 
+            text-align: center; 
+            box-shadow: 
+                20px 20px 40px var(--shadow-dark),
+                -20px -20px 40px var(--shadow-light);
+        }
+
+        .stars { 
+            color: var(--shadow-dark);
+            font-size: 2rem; 
+            cursor: pointer; 
+            margin: 15px 0; 
+            display: flex; 
+            justify-content: center; 
+            gap: 8px;
+        }
+
+        .stars span.active { 
+            color: var(--primary); 
+        }
+
+        /* Footer cart */
+        #footer-cart { 
+            position: fixed; 
+            bottom: 0; 
+            left: 0; 
+            width: 100%; 
+            background: var(--card-bg); 
+            border-top: 2px solid var(--border);
+            z-index: 2000; 
+            display: none;
+            box-shadow: 
+                -6px -6px 12px var(--shadow-dark),
+                6px 6px 12px var(--shadow-light);
+        }
+
+        /* View sections */
+        .view-section { 
+            display: none; 
+            position: relative;
+            z-index: 2;
+        }
+
+        .active { 
+            display: block; 
+        }
+
+        /* Animations */
+        @keyframes fadeInScale {
+            from { transform: scale(0.8); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+
+        .card {
+            animation: fadeInScale 0.5s ease-out;
+        }
+
+        /* Responsive amélioré */
+        @media (max-width: 768px) {
+            .grid-container {
+                grid-template-columns: 1fr;
+                gap: 15px;
+            }
+            
+            .stats-grid {
+                grid-template-columns: 1fr;
+                gap: 10px;
+            }
+            
+            .theme-toggle {
+                top: 65px;
+                right: 70px;
+                width: 45px;
+                height: 45px;
+            }
+            
+            .theme-toggle-icon {
+                font-size: 20px;
+            }
+            
+            header {
+                padding: 12px 15px;
+            }
+            
+            .btn-pro-header {
+                padding: 8px 14px;
+                font-size: 12px;
+            }
+            
+            .numpad-container {
+                width: 280px;
+                padding: 20px;
+            }
+            
+            .num-btn {
+                width: 60px;
+                height: 60px;
+                font-size: 1.5rem;
+            }
+            
+            .pin-display {
+                font-size: 1.5rem;
+                letter-spacing: 6px;
+            }
+        }
         
-        #footer-cart { position: fixed; bottom: 0; left: 0; width: 100%; background: #1a1a1a; border-top: 2px solid var(--primary); z-index: 2000; display: none; }
-        .view-section { display: none; }
-        .active { display: block; }
-        .confirm-panel { background: #4d0000; padding: 10px; border-radius: 5px; margin-top: 10px; display: none; text-align: center; border: 1px solid #ff4444; }
+        @media (max-width: 480px) {
+            .container {
+                padding: 15px;
+            }
+            
+            .card {
+                padding: 12px;
+            }
+            
+            .order-card-pro {
+                padding: 15px;
+            }
+            
+            .dashboard-box {
+                padding: 20px;
+            }
+            
+            .btn-neo {
+                padding: 10px 15px;
+                font-size: 13px;
+            }
+            
+            .input-box {
+                padding: 12px;
+            }
+        }
         
-        .toggle-status-btn { padding: 5px 10px; border-radius: 5px; border: none; font-weight: bold; cursor: pointer; font-size: 0.8rem; margin-left: 10px; }
-        .status-open { background: #28a745; color: white; }
-        .status-closed { background: #cc0000; color: white; }
+        @media (max-height: 700px) {
+            .numpad-container {
+                top: 40%;
+                max-height: 80vh;
+                overflow-y: auto;
+            }
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: var(--card-bg);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: var(--shadow-dark);
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--primary);
+        }
+
+        /* Badges */
+        .closed-badge { 
+            position: absolute; 
+            top: 15px; 
+            left: 15px; 
+            background: #f56565; 
+            color: white; 
+            padding: 4px 8px; 
+            border-radius: 10px; 
+            font-size: 0.7rem; 
+            font-weight: bold;
+            box-shadow: 
+                2px 2px 4px var(--shadow-dark),
+                -2px -2px 4px var(--shadow-light);
+        }
+
+        .expired-badge {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: #f56565;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 10px;
+            font-size: 0.7rem;
+            font-weight: bold;
+            box-shadow: 
+                2px 2px 4px var(--shadow-dark),
+                -2px -2px 4px var(--shadow-light);
+        }
+
+        /* Maps container */
+        .map-container {
+            width: 100%;
+            height: 300px;
+            border-radius: 15px;
+            margin: 15px 0;
+            box-shadow: 
+                4px 4px 8px var(--shadow-dark),
+                -4px -4px 8px var(--shadow-light);
+            border: 1px solid var(--border);
+            overflow: hidden;
+        }
+
+        /* Sub sections */
+        .sub-section { 
+            display: none; 
+            margin-top: 15px; 
+            padding: 20px; 
+            background: var(--card-bg);
+            border-radius: 20px; 
+            border: 1px solid var(--border);
+            box-shadow: 
+                inset 4px 4px 8px var(--shadow-dark),
+                inset -4px -4px 8px var(--shadow-light);
+        }
+
+        .btn-menu-pro { 
+            width: 100%; 
+            background: var(--card-bg);
+            color: var(--text); 
+            border: 1px solid var(--border);
+            padding: 18px; 
+            margin-top: 12px; 
+            border-radius: 20px; 
+            font-weight: bold; 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center;
+            box-shadow: 
+                6px 6px 12px var(--shadow-dark),
+                -6px -6px 12px var(--shadow-light);
+            transition: all 0.2s ease;
+            cursor: pointer;
+        }
+
+        .btn-menu-pro:hover {
+            transform: translateY(-2px);
+            box-shadow: 
+                8px 8px 16px var(--shadow-dark),
+                -8px -8px 16px var(--shadow-light);
+        }
+
+        .btn-menu-pro:active {
+            transform: translateY(0);
+            box-shadow: 
+                4px 4px 8px var(--shadow-dark),
+                -4px -4px 8px var(--shadow-light),
+                inset 2px 2px 4px var(--shadow-dark);
+        }
+
+        /* Edit modal */
+        .edit-modal {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: var(--card-bg);
+            padding: 30px;
+            border-radius: 25px;
+            border: 2px solid var(--border);
+            z-index: 6000;
+            width: 350px;
+            max-width: 90vw;
+            box-shadow: 
+                20px 20px 40px var(--shadow-dark),
+                -20px -20px 40px var(--shadow-light);
+        }
+
+        .edit-modal h3 {
+            margin-top: 0;
+            color: var(--primary);
+        }
+
+        .edit-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .edit-actions button {
+            flex: 1;
+        }
+
+        /* Type tags */
+        .type-tag {
+            background: var(--primary);
+            color: #000;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 0.7rem;
+            font-weight: bold;
+        }
+
+        /* Mini images */
+        .mini-img {
+            width: 40px;
+            height: 40px;
+            object-fit: cover;
+            border-radius: 8px;
+            margin-right: 10px;
+        }
+
+        .img-plat-client {
+            width: 60px;
+            height: 60px;
+            object-fit: cover;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: transform 0.2s ease;
+        }
+
+        .img-plat-client:hover {
+            transform: scale(1.05);
+        }
+
+        .zoom-image {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            max-width: 90vw;
+            max-height: 90vh;
+            z-index: 7000;
+            border-radius: 15px;
+            box-shadow: 
+                0 0 0 1000px rgba(0,0,0,0.8),
+                20px 20px 40px var(--shadow-dark);
+        }
+
+        /* Tracker line */
+        .tracker-line {
+            display: flex;
+            align-items: center;
+            padding: 10px;
+            background: var(--card-bg);
+            border-radius: 10px;
+            margin-bottom: 8px;
+            box-shadow: 
+                2px 2px 4px var(--shadow-dark),
+                -2px -2px 4px var(--shadow-light);
+            border: 1px solid var(--border);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            background: var(--primary);
+            border-radius: 50%;
+            margin-right: 10px;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
     </style>
 </head>
-<body>
+<body data-theme="dark">
+
+    <div class="theme-toggle" onclick="toggleTheme()">
+        <span class="theme-toggle-icon" id="theme-icon">🌙</span>
+    </div>
 
     <div id="loading-screen">
         <div class="spinner"></div>
-        <h2 style="color:var(--primary); font-style:italic">KOUL</h2>
+        <h2 style="color:var(--text); margin-top: 20px;">KOUL</h2>
+        <p style="color: var(--text); opacity: 0.7; margin-top: 10px;">Chargement...</p>
+    </div>
+
+    <div id="offline-indicator">
+        📵 Mode hors-ligne - Certaines fonctionnalités peuvent être limitées
     </div>
 
     <div id="notification-bar"><span id="notif-message">BIENVENUE</span></div>
@@ -121,75 +977,158 @@
     <div id="order-tracker-container"></div>
 
     <div id="rating-modal">
-        <h3 style="color:var(--primary); margin-top:0">Notation</h3>
-        <p style="font-size:0.8rem">Comment était le restaurant ?</p>
+        <h3 style="color:var(--primary); margin-top:0;">Notation</h3>
+        <p style="font-size:0.9rem">Comment était le restaurant ?</p>
         <div class="stars" id="star-resto">
             <span onclick="setRate('resto', 1)">★</span><span onclick="setRate('resto', 2)">★</span><span onclick="setRate('resto', 3)">★</span><span onclick="setRate('resto', 4)">★</span><span onclick="setRate('resto', 5)">★</span>
         </div>
-        <p style="font-size:0.8rem">Et le livreur ?</p>
+        <p style="font-size:0.9rem">Et le livreur ?</p>
         <div class="stars" id="star-livreur">
             <span onclick="setRate('livreur', 1)">★</span><span onclick="setRate('livreur', 2)">★</span><span onclick="setRate('livreur', 3)">★</span><span onclick="setRate('livreur', 4)">★</span><span onclick="setRate('livreur', 5)">★</span>
         </div>
-        <button class="btn-pro-header" style="width:100%; margin-top:10px" onclick="submitRating()">VALIDER</button>
+        <button class="btn-neo btn-primary" style="width:100%; margin-top:15px" onclick="submitRating()">VALIDER</button>
+    </div>
+
+    <!-- Edit Modal -->
+    <div id="edit-modal" class="edit-modal">
+        <h3>Modifier la validité</h3>
+        <div class="validity-input">
+            <label>Ajouter des jours:</label>
+            <input type="number" id="edit-days" class="input-box" placeholder="Nombre de jours" min="1" value="30">
+            <span>jours</span>
+        </div>
+        <div class="edit-actions">
+            <button class="btn-neo btn-success" onclick="confirmEditValidity()">CONFIRMER</button>
+            <button class="btn-neo btn-danger" onclick="closeEditModal()">ANNULER</button>
+        </div>
     </div>
 
     <header>
-        <h1 onclick="goToHome()" style="cursor:pointer">Koul</h1>
+        <h1 onclick="goToHome()" style="cursor:pointer;">Koul</h1>
         <button class="btn-pro-header" onclick="toggleLoginArea()">Pro</button>
     </header>
 
-    <div id="login-container" class="numpad-container"><div class="pin-display" id="pin-view"></div><div class="numpad" id="pad-main"></div><button onclick="toggleLoginArea()" style="margin-top:15px; background:none; border:none; color:#888">ANNULER</button></div>
-    <div id="client-pin-container" class="numpad-container"><h3 style="color:var(--primary)">CODE SECRET</h3><div class="pin-display" id="client-pin-view"></div><div class="numpad" id="numpad-client"></div><button onclick="closeClientPin()" style="margin-top:15px; background:none; border:none; color:#888">ANNULER</button></div>
-    <div id="delivery-validation-container" class="numpad-container"><h3 style="color:var(--primary)">CODE CLIENT</h3><div class="pin-display" id="delivery-pin-view"></div><div class="numpad" id="numpad-delivery"></div><button onclick="closeDeliveryPin()" style="margin-top:15px; background:none; border:none; color:#888">ANNULER</button></div>
+    <div id="login-container" class="numpad-container">
+        <div class="pin-display" id="pin-view"></div>
+        <div class="numpad" id="pad-main"></div>
+        <button class="btn-neo" onclick="toggleLoginArea()" style="margin-top:15px;">ANNULER</button>
+    </div>
+    
+    <div id="client-pin-container" class="numpad-container">
+        <h3 style="color:var(--primary);">CODE SECRET</h3>
+        <div class="pin-display" id="client-pin-view"></div>
+        <div class="numpad" id="numpad-client"></div>
+        <button class="btn-neo" onclick="closeClientPin()" style="margin-top:15px;">ANNULER</button>
+    </div>
+    
+    <div id="delivery-validation-container" class="numpad-container">
+        <h3 style="color:var(--primary);">CODE CLIENT</h3>
+        <div class="pin-display" id="delivery-pin-view"></div>
+        <div class="numpad" id="numpad-delivery"></div>
+        <button class="btn-neo" onclick="closeDeliveryPin()" style="margin-top:15px;">ANNULER</button>
+    </div>
 
-    <div id="view-restaurants" class="view-section active container"><div class="grid-container" id="res-grid"></div></div>
+    <div id="view-restaurants" class="view-section active container">
+        <div class="grid-container" id="res-grid"></div>
+    </div>
 
     <div id="view-menu-client" class="view-section container">
-        <button onclick="goToHome()" style="border:1px solid var(--primary); background:none; color:var(--primary); padding:8px; border-radius:5px; margin-bottom:15px">← RETOUR</button>
-        <h2 id="client-res-name"></h2><div id="plats-list-client"></div>
+        <button class="btn-neo" onclick="goToHome()" style="margin-bottom:15px;">← RETOUR</button>
+        
+        <div class="location-info" id="client-location">
+            <span class="location-icon">📍</span>
+            <div class="location-text">
+                <strong>Votre position:</strong><br>
+                <span id="client-coords">Détection en cours...</span>
+            </div>
+        </div>
+        
+        <h2 id="client-res-name"></h2>
+        <div id="plats-list-client"></div>
     </div>
 
     <div id="view-admin-space" class="view-section container">
-        <button onclick="goToHome()" style="border:1px solid var(--primary); background:none; color:var(--primary); padding:8px; border-radius:5px; margin-bottom:15px">← DÉCONNEXION</button>
+        <button class="btn-neo" onclick="goToHome()" style="margin-bottom:15px;">← DÉCONNEXION</button>
         <div class="dashboard-box">
             <h2>Admin</h2>
-            <button class="btn-menu-pro" onclick="toggleSec('adm-promo')">Message Promo <span>📣</span></button>
-            <div id="adm-promo" class="sub-section">
-                <input type="text" id="adm-promo-txt" class="input-box" placeholder="Votre message promo...">
-                <button class="btn-pro-header" style="width:100%" onclick="updatePromoMessage()">METTRE À JOUR</button>
+            
+            <!-- Tableau de bord statistique -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-number" id="stat-restaurants">0</div>
+                    <div class="stat-label">Restaurants</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="stat-livreurs">0</div>
+                    <div class="stat-label">Livreurs</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="stat-orders-today">0</div>
+                    <div class="stat-label">Commandes aujourd'hui</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="stat-total-revenue">0</div>
+                    <div class="stat-label">Revenus (DZD)</div>
+                </div>
             </div>
 
             <button class="btn-menu-pro" onclick="toggleSec('adm-res')">Restos <span>+</span></button>
             <div id="adm-res" class="sub-section">
-                <input type="text" id="adm-res-n" class="input-box" placeholder="Nom">
-                <input type="text" id="adm-res-c" class="input-box" placeholder="Code">
-                <input type="file" id="adm-res-img" class="input-box" accept="image/*">
-                <button class="btn-pro-header" style="width:100%" onclick="adminCreateRes()">AJOUTER</button>
-                <div id="list-res-to-manage" style="margin-top:10px"></div>
+                <h3 style="color: var(--primary); margin-bottom: 15px;">Nouveau Restaurant</h3>
+                
+                <div class="validity-container">
+                    <input type="text" id="adm-res-n" class="input-box" placeholder="Nom du restaurant">
+                    <input type="text" id="adm-res-c" class="input-box" placeholder="Code d'accès">
+                    <input type="file" id="adm-res-img" class="input-box" accept="image/*">
+                    
+                    <div class="validity-input">
+                        <label style="font-weight: bold;">Durée de validité:</label>
+                        <input type="number" id="adm-res-validity" class="input-box" placeholder="Nombre de jours" min="1" value="30">
+                        <span>jours</span>
+                    </div>
+                    
+                    <button class="btn-neo btn-primary" style="width:100%" onclick="adminCreateRes()">AJOUTER</button>
+                </div>
+                
+                <div id="list-res-to-manage" style="margin-top:20px;"></div>
             </div>
 
             <button class="btn-menu-pro" onclick="toggleSec('adm-liv')">Livreurs <span>+</span></button>
             <div id="adm-liv" class="sub-section">
-                <input type="text" id="adm-liv-n" class="input-box" placeholder="Nom">
-                <input type="text" id="adm-liv-c" class="input-box" placeholder="Code">
-                <input type="file" id="adm-liv-img" class="input-box" accept="image/*">
-                <button class="btn-pro-header" style="width:100%" onclick="adminCreateLiv()">AJOUTER</button>
-                <div id="list-liv-to-manage" style="margin-top:10px"></div>
+                <h3 style="color: var(--primary); margin-bottom: 15px;">Nouveau Livreur</h3>
+                
+                <div class="validity-container">
+                    <input type="text" id="adm-liv-n" class="input-box" placeholder="Nom du livreur">
+                    <input type="text" id="adm-liv-c" class="input-box" placeholder="Code d'accès">
+                    <input type="file" id="adm-liv-img" class="input-box" accept="image/*">
+                    
+                    <div class="validity-input">
+                        <label style="font-weight: bold;">Durée de validité:</label>
+                        <input type="number" id="adm-liv-validity" class="input-box" placeholder="Nombre de jours" min="1" value="30">
+                        <span>jours</span>
+                    </div>
+                    
+                    <button class="btn-neo btn-primary" style="width:100%" onclick="adminCreateLiv()">AJOUTER</button>
+                </div>
+                
+                <div id="list-liv-to-manage" style="margin-top:20px;"></div>
+            </div>
+
+            <button class="btn-menu-pro" onclick="toggleSec('adm-promo')">Message Promo <span>📣</span></button>
+            <div id="adm-promo" class="sub-section">
+                <input type="text" id="adm-promo-txt" class="input-box" placeholder="Votre message promo...">
+                <button class="btn-neo btn-primary" style="width:100%" onclick="updatePromoMessage()">METTRE À JOUR</button>
             </div>
 
             <button class="btn-menu-pro" onclick="toggleSec('adm-hist-section')">Journal Global <span>📜</span></button>
             <div id="adm-hist-section" class="sub-section">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px">
-                    <h3 style="margin:0">Historique</h3>
+                    <h3 style="margin:0;">Historique</h3>
                     <div>
-                        <button class="btn-icon" onclick="exportHistory()" title="Exporter">💾 TXT</button>
-                        <button class="btn-icon" onclick="showClearConfirm()" title="Vider" style="color:#ff4444">🗑️</button>
+                        <button class="btn-neo btn-danger" onclick="clearHistory()" title="Vider l'historique">🗑️ VIDER</button>
+                        <button class="btn-neo" onclick="exportAdvancedData()" title="Exporter avancé">📊 CSV</button>
+                        <button class="btn-neo" onclick="exportHistory()" title="Exporter">💾 TXT</button>
                     </div>
-                </div>
-                <div id="clear-confirm-panel" class="confirm-panel">
-                    <p>Vider l'historique définitivement ?</p>
-                    <button class="btn-finish" onclick="clearHistory()">OUI</button>
-                    <button class="btn-reject" onclick="showClearConfirm(false)">NON</button>
                 </div>
                 <div id="admin-hist-list"></div>
             </div>
@@ -197,11 +1136,39 @@
     </div>
 
     <div id="view-pro-space" class="view-section container">
-        <button onclick="goToHome()" style="border:1px solid var(--primary); background:none; color:var(--primary); padding:8px; border-radius:5px; margin-bottom:15px">← DÉCONNEXION</button>
+        <button class="btn-neo" onclick="goToHome()" style="margin-bottom:15px;">← DÉCONNEXION</button>
         <div class="dashboard-box">
             <div style="display:flex; align-items:center; margin-bottom:15px">
-                <h2 id="pro-res-title" style="margin:0"></h2>
-                <button id="pro-toggle-status" class="toggle-status-btn" onclick="toggleResStatus()">...</button>
+                <h2 id="pro-res-title" style="margin:0;"></h2>
+                <button id="pro-toggle-status" class="btn-neo" style="margin-left: 10px;">...</button>
+            </div>
+            
+            <!-- Statut de validité -->
+            <div class="validity-container" id="pro-validity-info">
+                <div class="validity-status" id="pro-validity-status">
+                    Vérification de la validité...
+                </div>
+            </div>
+            
+            <!-- Stats restaurant -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-number" id="pro-orders-today">0</div>
+                    <div class="stat-label">Commandes aujourd'hui</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="pro-revenue-today">0</div>
+                    <div class="stat-label">Revenus (DZD)</div>
+                </div>
+            </div>
+            
+            <!-- Localisation du restaurant -->
+            <div class="location-info" id="restaurant-location">
+                <span class="location-icon">📍</span>
+                <div class="location-text">
+                    <strong>Votre restaurant:</strong><br>
+                    <span id="restaurant-coords">Détection en cours...</span>
+                </div>
             </div>
             
             <button class="btn-menu-pro" onclick="toggleSec('orders-list-pro-container')">Commandes en cours 📋</button>
@@ -215,35 +1182,74 @@
                 <input type="number" id="new-p" class="input-box" placeholder="Prix DZD">
                 <input type="number" id="new-s" class="input-box" placeholder="Stock initial">
                 <input type="file" id="new-img" class="input-box" accept="image/*">
-                <button class="btn-pro-header" style="width:100%" onclick="addNewPlat()">ENREGISTRER</button>
+                <button class="btn-neo btn-primary" style="width:100%" onclick="addNewPlat()">ENREGISTRER</button>
             </div>
+            
             <button class="btn-menu-pro" onclick="toggleSec('manage-plats')">Stocks & Plats <span>⚙</span></button>
             <div id="manage-plats" class="sub-section"></div>
             
-            <hr style="border:0; border-top:1px solid #444; margin:20px 0">
-            <h3>Historique Restaurant</h3>
+            <h3 style="margin-top: 20px;">Historique Restaurant</h3>
             <div id="res-event-log" style="max-height:300px; overflow-y:auto;"></div>
         </div>
     </div>
 
     <div id="view-livreur-space" class="view-section container">
-        <button onclick="logoutLivreur()" style="border:1px solid var(--primary); background:none; color:var(--primary); padding:8px; border-radius:5px; margin-bottom:15px">← DÉCONNEXION</button>
-        <div class="dashboard-box"><h2 id="liv-name"></h2><div id="liv-orders"></div><hr><div id="liv-hist"></div></div>
+        <button class="btn-neo" onclick="logoutLivreur()" style="margin-bottom:15px;">← DÉCONNEXION</button>
+        <div class="dashboard-box">
+            <h2 id="liv-name"></h2>
+            
+            <!-- Statut de validité -->
+            <div class="validity-container" id="liv-validity-info">
+                <div class="validity-status" id="liv-validity-status">
+                    Vérification de la validité...
+                </div>
+            </div>
+            
+            <!-- Localisation du livreur -->
+            <div class="location-info" id="livreur-location">
+                <span class="location-icon">📍</span>
+                <div class="location-text">
+                    <strong>Votre position:</strong><br>
+                    <span id="livreur-coords">Détection en cours...</span>
+                </div>
+            </div>
+            
+            <!-- Stats livreur -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-number" id="liv-deliveries-today">0</div>
+                    <div class="stat-label">Livraisons aujourd'hui</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="liv-earnings-today">0</div>
+                    <div class="stat-label">Gains (DZD)</div>
+                </div>
+            </div>
+            
+            <div id="liv-orders"></div>
+            
+            <h3 style="margin-top: 20px;">Historique</h3>
+            <div id="liv-hist"></div>
+        </div>
     </div>
 
     <div id="footer-cart">
-        <div id="cart-items-list" style="max-height:80px; overflow:auto; padding:10px; font-size:0.8rem"></div>
+        <div id="cart-items-list" style="max-height:80px; overflow:auto; padding:12px; font-size:0.8rem;"></div>
         <div id="footer-form-client">
-            <div style="padding:0 10px"><input type="text" id="c-name" class="input-box" placeholder="Nom"><input type="tel" id="c-tel" class="input-box" placeholder="Tél"></div>
-            <div style="padding:10px; display:flex; justify-content:space-between; align-items:center">
+            <div style="padding:0 12px">
+                <input type="text" id="c-name" class="input-box" placeholder="Nom">
+                <input type="tel" id="c-tel" class="input-box" placeholder="Tél">
+            </div>
+            <div style="padding:12px; display:flex; justify-content:space-between; align-items:center">
                 <b>Total: <span id="cart-total">0</span> DZD</b>
-                <button class="btn-finish" style="flex:none; padding:10px 20px" onclick="openClientPin()">COMMANDER</button>
+                <button class="btn-neo btn-success" style="flex:none; padding:12px 24px" onclick="openClientPin()">COMMANDER</button>
             </div>
         </div>
-        <div id="footer-closed-msg" style="display:none; text-align:center; padding:15px; background:red; color:white; font-weight:bold">RESTAURANT FERMÉ POUR LE MOMENT</div>
+        <div id="footer-closed-msg" style="display:none; text-align:center; padding:18px;" class="validity-expired">RESTAURANT FERMÉ POUR LE MOMENT</div>
     </div>
 
     <script>
+        // Configuration Firebase
         const firebaseConfig = {
             apiKey: "AIzaSyD4ekJLYuL5QTsroQj_QlOUPohDwhlQ14s",
             authDomain: "koul-ec357.firebaseapp.com",
@@ -253,35 +1259,933 @@
             messagingSenderId: "461125460557",
             appId: "1:461125460557:web:31b3f4366ec233bf9b3204"
         };
+        
+        // Initialisation
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
-
-        let restaurants = [], livreurs = [], adminHistory = [], cart = {}, currentRes = null, currentLivreur = null, currentPin = "", clientTempPin = "", deliveryTempPin = "";
+        let messaging = null;
+        
+        // Variables globales
+        let restaurants = [], livreurs = [], adminHistory = [], cart = {}, currentRes = null, currentLivreur = null;
+        let currentPin = "", clientTempPin = "", deliveryTempPin = "";
         let pendingResId = null, pendingOrderId = null, rates = {resto:0, livreur:0};
         let promoMessage = "BIENVENUE";
+        let isOnline = navigator.onLine;
+        let userLocation = null;
+        let map = null;
+        let directionsService = null;
+        let directionsRenderer = null;
+        let editingAccountId = null;
+        let editingAccountType = null;
 
+        // Toggle thème
+        function toggleTheme() {
+            const body = document.body;
+            const currentTheme = body.getAttribute('data-theme');
+            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            body.setAttribute('data-theme', newTheme);
+            localStorage.setItem('theme', newTheme);
+            
+            const icon = document.getElementById('theme-icon');
+            icon.textContent = newTheme === 'dark' ? '🌙' : '☀️';
+        }
+
+        // Charger le thème sauvegardé
+        function loadTheme() {
+            const savedTheme = localStorage.getItem('theme') || 'dark';
+            document.body.setAttribute('data-theme', savedTheme);
+            document.getElementById('theme-icon').textContent = savedTheme === 'dark' ? '🌙' : '☀️';
+        }
+
+        // Initialisation Google Maps
+        function initMap() {
+            map = new google.maps.Map(document.getElementById('map'), {
+                center: { lat: 36.7538, lng: 3.0588 },
+                zoom: 12
+            });
+            
+            directionsService = new google.maps.DirectionsService();
+            directionsRenderer = new google.maps.DirectionsRenderer({
+                draggable: true,
+                panel: document.getElementById('directions-panel')
+            });
+        }
+
+        // Gestion du mode hors-ligne
+        function updateOnlineStatus() {
+            isOnline = navigator.onLine;
+            const offlineIndicator = document.getElementById('offline-indicator');
+            offlineIndicator.style.display = isOnline ? 'none' : 'block';
+            
+            if (!isOnline) {
+                setNotif("📵 Mode hors-ligne activé");
+            } else {
+                setNotif("🌐 Connexion rétablie");
+                syncOfflineData();
+            }
+        }
+
+        // Géolocalisation
+        async function initGeolocation() {
+            if (!navigator.geolocation) {
+                console.log('Géolocalisation non supportée');
+                return;
+            }
+
+            try {
+                const position = await new Promise((resolve, reject) => {
+                    navigator.geolocation.getCurrentPosition(resolve, reject, {
+                        enableHighAccuracy: true,
+                        timeout: 10000,
+                        maximumAge: 300000
+                    });
+                });
+                
+                userLocation = {
+                    lat: position.coords.latitude,
+                    lng: position.coords.longitude
+                };
+                
+                console.log('Position:', userLocation);
+                updateLocationDisplays();
+                
+                if (currentLivreur) {
+                    startLocationTracking();
+                }
+                
+            } catch (error) {
+                console.error('Erreur géolocalisation:', error);
+            }
+        }
+
+        function updateLocationDisplays() {
+            if (!userLocation) return;
+            
+            // Client location
+            const clientCoords = document.getElementById('client-coords');
+            if (clientCoords) {
+                clientCoords.textContent = `${userLocation.lat.toFixed(4)}, ${userLocation.lng.toFixed(4)}`;
+            }
+            
+            // Restaurant location
+            if (currentRes && currentRes.location) {
+                const restaurantCoords = document.getElementById('restaurant-coords');
+                if (restaurantCoords) {
+                    restaurantCoords.textContent = `${currentRes.location.lat.toFixed(4)}, ${currentRes.location.lng.toFixed(4)}`;
+                }
+            }
+            
+            // Livreur location
+            if (currentLivreur && currentLivreur.location) {
+                const livreurCoords = document.getElementById('livreur-coords');
+                if (livreurCoords) {
+                    livreurCoords.textContent = `${currentLivreur.location.lat.toFixed(4)}, ${currentLivreur.location.lng.toFixed(4)}`;
+                }
+            }
+        }
+
+        function startLocationTracking() {
+            if (!currentLivreur || !navigator.geolocation) return;
+            
+            const watchId = navigator.geolocation.watchPosition(
+                (position) => {
+                    currentLivreur.location = {
+                        lat: position.coords.latitude,
+                        lng: position.coords.longitude
+                    };
+                    
+                    db.ref(`livreurs/${currentLivreur.id}/location`).set(currentLivreur.location);
+                    updateLocationDisplays();
+                },
+                (error) => console.error('Erreur tracking:', error),
+                {
+                    enableHighAccuracy: true,
+                    timeout: 10000
+                }
+            );
+        }
+
+        // Calcul de distance
+        function calculateDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371; // Rayon de la Terre en km
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                      Math.sin(dLon/2) * Math.sin(dLon/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            return R * c; // Distance en km
+        }
+
+        // Afficher itinéraire Google Maps
+        function showDirections(origin, destination, travelMode = 'DRIVING') {
+            if (!directionsService || !directionsRenderer) return;
+            
+            const request = {
+                origin: origin,
+                destination: destination,
+                travelMode: google.maps.TravelMode[travelMode]
+            };
+            
+            directionsService.route(request, (result, status) => {
+                if (status === 'OK') {
+                    directionsRenderer.setDirections(result);
+                } else {
+                    console.error('Erreur directions:', status);
+                }
+            });
+        }
+
+        // Vérification de validité des comptes
+        function checkAccountValidity(account) {
+            if (!account.validityEndDate) return false;
+            
+            const now = new Date();
+            const validityEnd = new Date(account.validityEndDate);
+            
+            return now <= validityEnd;
+        }
+
+        function getValidityDaysLeft(account) {
+            if (!account.validityEndDate) return 0;
+            
+            const now = new Date();
+            const validityEnd = new Date(account.validityEndDate);
+            const diffTime = validityEnd - now;
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            
+            return Math.max(0, diffDays);
+        }
+
+        function updateValidityDisplay(account, type) {
+            const statusElement = type === 'restaurant' ? 
+                document.getElementById('pro-validity-status') : 
+                document.getElementById('liv-validity-status');
+            
+            if (!statusElement) return;
+            
+            const daysLeft = getValidityDaysLeft(account);
+            const isValid = checkAccountValidity(account);
+            
+            if (isValid) {
+                statusElement.className = 'validity-status validity-active';
+                statusElement.textContent = `✅ Compte valide - ${daysLeft} jour(s) restant(s)`;
+            } else {
+                statusElement.className = 'validity-status validity-expired';
+                statusElement.textContent = `❌ Compte expiré - ${Math.abs(daysLeft)} jour(s) d'expiration`;
+            }
+        }
+
+        // Écoute Firebase
         db.ref('cloud_koul').on('value', (snapshot) => {
             const data = snapshot.val();
             document.getElementById('loading-screen').style.display = 'none';
+            
             if(data) {
                 restaurants = data.restaurants || [];
                 livreurs = data.livreurs || [];
                 adminHistory = data.adminHistory || [];
                 promoMessage = data.promoMessage || "BIENVENUE";
+                
                 document.getElementById('notif-message').innerText = promoMessage;
+                
                 if(currentRes) {
                     const updatedRes = restaurants.find(r => r.id === currentRes.id);
                     if(updatedRes) currentRes = updatedRes;
+                    updateValidityDisplay(currentRes, 'restaurant');
                 }
+                
                 if(currentLivreur) {
                     const updatedLiv = livreurs.find(l => l.id === currentLivreur.id);
                     if(updatedLiv) currentLivreur = updatedLiv;
+                    updateValidityDisplay(currentLivreur, 'livreur');
                 }
+                
                 refreshCurrentView();
                 checkActiveOrder();
+                updateStatistics();
             }
-            if(document.getElementById('view-restaurants').classList.contains('active')) { init(); }
+            
+            if(document.getElementById('view-restaurants').classList.contains('active')) { 
+                init(); 
+            }
         });
+
+        // Mise à jour des statistiques
+        function updateStatistics() {
+            // Stats admin
+            document.getElementById('stat-restaurants').textContent = restaurants.length;
+            document.getElementById('stat-livreurs').textContent = livreurs.length;
+            
+            const today = new Date().toLocaleDateString();
+            let todayOrders = 0;
+            let todayRevenue = 0;
+            
+            restaurants.forEach(res => {
+                if (res.orders) {
+                    res.orders.forEach(order => {
+                        if (new Date(order.timestamp || Date.now()).toLocaleDateString() === today) {
+                            todayOrders++;
+                            todayRevenue += parseInt(order.total || 0);
+                        }
+                    });
+                }
+            });
+            
+            document.getElementById('stat-orders-today').textContent = todayOrders;
+            document.getElementById('stat-total-revenue').textContent = todayRevenue;
+        }
+
+        // Création de restaurant avec validité
+        function adminCreateRes() {
+            const name = document.getElementById('adm-res-n').value;
+            const code = document.getElementById('adm-res-c').value;
+            const validityDays = parseInt(document.getElementById('adm-res-validity').value) || 30;
+            const file = document.getElementById('adm-res-img').files[0];
+            
+            if(name && code && validityDays > 0) {
+                const validityEndDate = new Date();
+                validityEndDate.setDate(validityEndDate.getDate() + validityDays);
+                
+                const add = (imgData) => {
+                    const newRestaurant = {
+                        id: Date.now(),
+                        name: name,
+                        code: code,
+                        img: imgData,
+                        plats: [],
+                        orders: [],
+                        eventHistory: [],
+                        open: true,
+                        validityEndDate: validityEndDate.toISOString(),
+                        location: null
+                    };
+                    
+                    restaurants.push(newRestaurant);
+                    logAdminEvent("SYSTEM", `Resto créé: ${name} (${validityDays} jours)`);
+                    renderAdminResList();
+                    setNotif("RESTO AJOUTÉ");
+                    pushData();
+                    updateStatistics();
+                };
+                
+                if(file) compressImage(file, 400, add);
+                else add('');
+            }
+        }
+
+        // Création de livreur avec validité
+        function adminCreateLiv() {
+            const name = document.getElementById('adm-liv-n').value;
+            const code = document.getElementById('adm-liv-c').value;
+            const validityDays = parseInt(document.getElementById('adm-liv-validity').value) || 30;
+            const file = document.getElementById('adm-liv-img').files[0];
+            
+            if(name && code && validityDays > 0) {
+                const validityEndDate = new Date();
+                validityEndDate.setDate(validityEndDate.getDate() + validityDays);
+                
+                const add = (imgData) => {
+                    const newLivreur = {
+                        id: Date.now(),
+                        name: name,
+                        code: code,
+                        img: imgData,
+                        history: [],
+                        validityEndDate: validityEndDate.toISOString(),
+                        location: null
+                    };
+                    
+                    livreurs.push(newLivreur);
+                    logAdminEvent("SYSTEM", `Livreur créé: ${name} (${validityDays} jours)`);
+                    renderAdminLivList();
+                    setNotif("LIVREUR AJOUTÉ");
+                    pushData();
+                    updateStatistics();
+                };
+                
+                if(file) compressImage(file, 300, add);
+                else add('');
+            }
+        }
+
+        // Fonctions utilitaires
+        function setNotif(msg) { 
+            const bar = document.getElementById('notification-bar');
+            document.getElementById('notif-message').innerText = msg;
+            setTimeout(() => { 
+                document.getElementById('notif-message').innerText = promoMessage; 
+            }, 3000);
+        }
+
+        function pushData() { 
+            db.ref('cloud_koul').set({ 
+                restaurants: restaurants || [], 
+                livreurs: livreurs || [], 
+                adminHistory: adminHistory || [], 
+                promoMessage: promoMessage || "BIENVENUE" 
+            }); 
+        }
+
+        function logAdminEvent(type, details) { 
+            const now = new Date(); 
+            adminHistory.unshift({ 
+                type, 
+                details, 
+                time: String(now.getHours()).padStart(2, '0') + ":" + String(now.getMinutes()).padStart(2, '0'), 
+                date: now.toLocaleDateString() 
+            }); 
+            pushData(); 
+        }
+
+        function logResEvent(res, status, order) {
+            if(!res.eventHistory) res.eventHistory = [];
+            const now = new Date();
+            res.eventHistory.unshift({
+                status: status,
+                client: order.client || order.name || 'N/A',
+                date: now.toLocaleDateString(),
+                time: String(now.getHours()).padStart(2, '0') + ":" + String(now.getMinutes()).padStart(2, '0'),
+                details: order.itemsText || order.total || ''
+            });
+        }
+
+        // Processus de login avec vérification de validité
+        function processLogin() {
+            const pin = currentPin; 
+            toggleLoginArea();
+            
+            if(pin === "1747") { 
+                showSection('view-admin-space'); 
+                renderAdminResList(); 
+                renderAdminLivList(); 
+                renderAdminHistory(); 
+                updateStatistics();
+            } else {
+                const r = restaurants.find(x => x.code === pin);
+                const l = livreurs.find(x => x.code === pin);
+                
+                if(r) {
+                    // Vérifier la validité du restaurant
+                    if (!checkAccountValidity(r)) {
+                        const daysExpired = Math.abs(getValidityDaysLeft(r));
+                        setNotif(`❌ Compte restaurant expiré depuis ${daysExpired} jour(s)`);
+                        return;
+                    }
+                    
+                    currentRes = r; 
+                    showSection('view-pro-space'); 
+                    document.getElementById('pro-res-title').innerText = r.name; 
+                    updateValidityDisplay(r, 'restaurant');
+                    renderProOrders(); 
+                    renderProPlats(); 
+                    renderResHistory(); 
+                    updateProStatusUI();
+                } else if(l) {
+                    // Vérifier la validité du livreur
+                    if (!checkAccountValidity(l)) {
+                        const daysExpired = Math.abs(getValidityDaysLeft(l));
+                        setNotif(`❌ Compte livreur expiré depuis ${daysExpired} jour(s)`);
+                        return;
+                    }
+                    
+                    currentLivreur = l; 
+                    showSection('view-livreur-space'); 
+                    document.getElementById('liv-name').innerText = l.name; 
+                    updateValidityDisplay(l, 'livreur');
+                    renderLivreurOrders(); 
+                    renderLivreurHistory();
+                    startLocationTracking();
+                } else {
+                    setNotif("CODE ERRONÉ");
+                }
+            }
+        }
+
+        // Autres fonctions
+        function toggleLoginArea() { 
+            const a = document.getElementById('login-container'); 
+            a.style.display = a.style.display==='block'?'none':'block'; 
+            currentPin=""; 
+            document.getElementById('pin-view').innerText=""; 
+        }
+
+        function showSection(id) { 
+            document.querySelectorAll('.view-section').forEach(s => s.classList.remove('active')); 
+            document.getElementById(id).classList.add('active'); 
+            document.getElementById('footer-cart').style.display = (id === 'view-menu-client' && Object.keys(cart).length > 0) ? 'block' : 'none';
+        }
+
+        function goToHome() { 
+            cart = {}; 
+            currentRes = null; 
+            currentLivreur = null; 
+            showSection('view-restaurants'); 
+            init(); 
+        }
+
+        function generatePads() {
+            const pads = ['pad-main', 'numpad-client', 'numpad-delivery'];
+            pads.forEach(id => {
+                const el = document.getElementById(id); 
+                el.innerHTML = '';
+                for(let i=1; i<=9; i++) el.innerHTML += `<button class="num-btn" onclick="pressPad('${id}','${i}')">${i}</button>`;
+                el.innerHTML += `<button class="num-btn clear" onclick="pressPad('${id}','C')">C</button>`;
+                el.innerHTML += `<button class="num-btn" onclick="pressPad('${id}','0')">${0}</button>`;
+                el.innerHTML += `<button class="num-btn ok" onclick="submitPad('${id}')">OK</button>`;
+            });
+        }
+
+        function pressPad(id, v) {
+            if(id === 'pad-main') { 
+                if(v==='C') currentPin=""; 
+                else if(currentPin.length<4) currentPin+=v; 
+                document.getElementById('pin-view').innerText=currentPin.replace(/./g,'*'); 
+            }
+            if(id === 'numpad-client') { 
+                if(v==='C') clientTempPin=""; 
+                else if(clientTempPin.length<4) clientTempPin+=v; 
+                document.getElementById('client-pin-view').innerText=clientTempPin; 
+            }
+            if(id === 'numpad-delivery') { 
+                if(v==='C') deliveryTempPin=""; 
+                else if(deliveryTempPin.length<4) deliveryTempPin+=v; 
+                document.getElementById('delivery-pin-view').innerText=deliveryTempPin; 
+            }
+        }
+
+        function submitPad(id) { 
+            if(id === 'pad-main') processLogin(); 
+            if(id === 'numpad-client') confirmClientOrder(); 
+            if(id === 'numpad-delivery') confirmDelivery(); 
+        }
+
+        // Fonctions de rendu
+        function renderAdminResList() { 
+            const l = document.getElementById('list-res-to-manage'); 
+            l.innerHTML = ''; 
+            restaurants.forEach((r) => {
+                const daysLeft = getValidityDaysLeft(r);
+                const isValid = checkAccountValidity(r);
+                const badge = isValid ? 
+                    `<span style="color: #48bb78;">✅ ${daysLeft}j</span>` : 
+                    `<span style="color: #f56565;">❌ Exp.</span>`;
+                    
+                l.innerHTML += `
+                    <div class="order-card-pro">
+                        <div style="display:flex;justify-content:space-between;align-items:center;">
+                            <span onclick="openEditModal(${r.id}, 'restaurant')" style="cursor:pointer; flex:1;">${r.name} <b>(Code: ${r.code})</b></span>
+                            <div>
+                                ${badge}
+                                <button class="btn-neo btn-danger" onclick="deleteRes(${r.id})" style="margin-left: 10px;">X</button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }); 
+        }
+
+        function renderAdminLivList() { 
+            const l = document.getElementById('list-liv-to-manage'); 
+            l.innerHTML = ''; 
+            livreurs.forEach((liv) => {
+                const daysLeft = getValidityDaysLeft(liv);
+                const isValid = checkAccountValidity(liv);
+                const badge = isValid ? 
+                    `<span style="color: #48bb78;">✅ ${daysLeft}j</span>` : 
+                    `<span style="color: #f56565;">❌ Exp.</span>`;
+                    
+                l.innerHTML += `
+                    <div class="order-card-pro">
+                        <div style="display:flex;justify-content:space-between;align-items:center;">
+                            <span onclick="openEditModal(${liv.id}, 'livreur')" style="cursor:pointer; flex:1;">${liv.name} <b>(Code: ${liv.code})</b></span>
+                            <div>
+                                ${badge}
+                                <button class="btn-neo btn-danger" onclick="deleteLiv(${liv.id})" style="margin-left: 10px;">X</button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }); 
+        }
+
+        function init() { 
+            const grid = document.getElementById('res-grid'); 
+            grid.innerHTML = ''; 
+            restaurants.forEach(res => { 
+                const isValid = checkAccountValidity(res);
+                const closed = res.open === false ? '<div class="closed-badge">FERMÉ</div>' : '';
+                const expired = '';
+                
+                grid.innerHTML += `
+                    <div class="card" onclick="openClientMenu(${res.id})">
+                        ${closed}${expired}
+                        <img src="${res.img || 'https://via.placeholder.com/150'}">
+                        <br><b>${res.name}</b>
+                    </div>
+                `; 
+            }); 
+            generatePads(); 
+        }
+
+        // Fonctions complètes
+        function renderAdminHistory() { 
+            const l = document.getElementById('admin-hist-list'); 
+            l.innerHTML = ''; 
+            adminHistory.forEach(h => { 
+                l.innerHTML += `
+                    <div class="order-card-pro" style="border-left: 4px solid var(--primary);">
+                        <span class="type-tag">${h.type}</span>
+                        <br><b>${h.details}</b>
+                        <br><small>${h.date} ${h.time}</small>
+                    </div>
+                `; 
+            }); 
+        }
+
+        function renderProOrders() {
+            const l = document.getElementById('orders-list-pro'); 
+            l.innerHTML = '';
+            if(currentRes.orders && currentRes.orders.length > 0) {
+                currentRes.orders.forEach((o, i) => {
+                    let statusColor = o.status === 'new' ? 'var(--primary)' : (o.status === 'waiting' ? 'orange' : '#48bb78');
+                    let statusText = o.status === 'new' ? 'REÇUE' : (o.status === 'waiting' ? 'PUBLIÉE' : (o.livName ? `Prise par ${o.livName}` : 'EN COURS'));
+                    
+                    // Calculer distance si localisation disponible
+                    let distanceInfo = '';
+                    if (o.clientLocation && currentRes.location) {
+                        const distance = calculateDistance(
+                            currentRes.location.lat, currentRes.location.lng,
+                            o.clientLocation.lat, o.clientLocation.lng
+                        );
+                        distanceInfo = `<br><small>📍 Distance: ${distance.toFixed(1)} km</small>`;
+                    }
+                    
+                    l.innerHTML += `
+                        <div class="order-card-pro" style="border-left: 6px solid ${statusColor}">
+                            <div style="display:flex; justify-content:space-between">
+                                <b>${o.client}</b> 
+                                <small>${statusText}</small>
+                            </div>
+                            <small>${o.itemsText}</small>${distanceInfo}
+                            <br><b>${o.total} DZD</b>
+                            <div class="order-actions">
+                                <a href="tel:${o.tel}" class="btn-neo btn-success">APPELER</a>
+                                ${o.status === 'new' ? `<button class="btn-neo btn-primary" onclick="updateOrderStatus(${i}, 'waiting')">PUBLIER</button>` : ''}
+                                <button class="btn-neo btn-danger" onclick="cancelOrder(${o.id})">SUPPRIMER</button>
+                                ${o.status === 'waiting' || o.status === 'shipping' ? `<button class="btn-neo btn-success" onclick="openValPin(${currentRes.id}, ${o.id})">CLÔTURER</button>` : ''}
+                            </div>
+                        </div>
+                    `;
+                });
+            } else { 
+                l.innerHTML = '<p style="text-align:center; opacity:0.7;">Aucune commande en cours.</p>'; 
+            }
+        }
+
+        function renderProPlats() { 
+            const l = document.getElementById('manage-plats'); 
+            l.innerHTML = ''; 
+            if(currentRes.plats) currentRes.plats.forEach((p, i) => { 
+                l.innerHTML += `
+                    <div class="order-card-pro">
+                        <img src="${p.img}" class="mini-img">
+                        <div style="flex:1">
+                            <b>${p.n}</b><br>
+                            <small>${p.p} DZD</small>
+                        </div>
+                        <div style="display:flex; align-items:center">
+                            <input type="number" value="${p.stock}" id="stk-${i}" class="input-box" style="width:80px;">
+                            <button class="btn-neo btn-primary" onclick="updateStock(${i})">OK</button>
+                            <button class="btn-neo btn-danger" onclick="deletePlat(${p.id})">X</button>
+                        </div>
+                    </div>
+                `; 
+            }); 
+        }
+
+        function renderResHistory() { 
+            const l = document.getElementById('res-event-log'); 
+            if(!l) return; 
+            l.innerHTML = ''; 
+            if(!currentRes.eventHistory || currentRes.eventHistory.length === 0) { 
+                l.innerHTML = '<p style="opacity:0.7; font-size:0.8rem">Aucun événement.</p>'; 
+                return; 
+            } 
+            currentRes.eventHistory.forEach(ev => { 
+                l.innerHTML += `
+                    <div class="order-card-pro" style="font-size:0.75rem;">
+                        <small>${ev.date} ${ev.time}</small><br>
+                        <b>${ev.status}</b> - ${ev.client}
+                    </div>
+                `; 
+            }); 
+        }
+
+        function updateProStatusUI() {
+            const btn = document.getElementById('pro-toggle-status');
+            if (!btn) return;
+            const isOpen = currentRes.open !== false;
+            btn.innerText = isOpen ? "OUVERT" : "FERMÉ";
+            btn.className = isOpen ? "btn-neo btn-success" : "btn-neo btn-danger";
+            btn.onclick = toggleRestaurantStatus;
+        }
+        
+        function toggleRestaurantStatus() {
+            if (!currentRes) return;
+            
+            currentRes.open = !currentRes.open;
+            const newStatus = currentRes.open ? "OUVERT" : "FERMÉ";
+            
+            logAdminEvent(currentRes.name, `Statut changé: ${newStatus}`);
+            setNotif(`Restaurant ${newStatus}`);
+            
+            updateProStatusUI();
+            pushData();
+        }
+
+        function renderLivreurOrders() {
+            const l = document.getElementById('liv-orders'); 
+            l.innerHTML = '<h3>Missions</h3>';
+            const isBusy = hasActiveOrder(currentLivreur.id);
+            const myHiddenOrders = JSON.parse(localStorage.getItem(`koul_hidden_orders_${currentLivreur.id}`) || '[]');
+            
+            restaurants.forEach(res => {
+                if(res.orders) res.orders.forEach(o => {
+                    if(!myHiddenOrders.includes(o.id) && (o.status === 'waiting' || (o.status === 'shipping' && o.livId === currentLivreur.id))) {
+                        const canTake = !isBusy && o.status === 'waiting';
+                        const isBeingShippedByMe = o.status === 'shipping' && o.livId === currentLivreur.id;
+                        
+                        // Calculer distances
+                        let distanceInfo = '';
+                        if (currentLivreur.location && res.location) {
+                            const distanceToRes = calculateDistance(
+                                currentLivreur.location.lat, currentLivreur.location.lng,
+                                res.location.lat, res.location.lng
+                            );
+                            distanceInfo = `<br><small>📍 Restaurant: ${distanceToRes.toFixed(1)} km</small>`;
+                        }
+                        
+                        if (o.clientLocation && currentLivreur.location) {
+                            const distanceToClient = calculateDistance(
+                                currentLivreur.location.lat, currentLivreur.location.lng,
+                                o.clientLocation.lat, o.clientLocation.lng
+                            );
+                            distanceInfo += `<br><small>📍 Client: ${distanceToClient.toFixed(1)} km</small>`;
+                        }
+                        
+                        l.innerHTML += `
+                            <div class="order-card-pro">
+                                <b style="color:var(--primary)">${res.name}</b><br>
+                                <b>Client: ${o.client}</b>${distanceInfo}
+                                <div class="order-actions">
+                                    ${canTake ? `<button class="btn-neo btn-primary" onclick="takeOrd(${res.id}, ${o.id})">PRENDRE</button>` : ''}
+                                    ${o.status === 'waiting' ? `<button class="btn-neo btn-danger" onclick="ignoreOrd(${o.id})">MASQUER</button>` : ''}
+                                    ${isBeingShippedByMe ? `<a href="tel:${o.tel}" class="btn-neo btn-success">APPELER</a>` : ''}
+                                    ${isBeingShippedByMe ? `<button class="btn-neo btn-primary" onclick="showDirectionsToRestaurant(${res.location})">🗺️ ITINÉRAIRE RESTO</button>` : ''}
+                                    ${isBeingShippedByMe ? `<button class="btn-neo btn-success" onclick="openValPin(${res.id}, ${o.id})">VALIDER LIVRAISON</button>` : ''}
+                                </div>
+                                ${isBusy && o.status === 'waiting' ? '<small style="color:orange">Terminez votre livraison actuelle pour en prendre une autre.</small>' : ''}
+                            </div>
+                        `;
+                    }
+                });
+            });
+        }
+
+        function renderLivreurHistory() { 
+            const l = document.getElementById('liv-hist'); 
+            l.innerHTML = '<h4>Historique</h4>'; 
+            if(currentLivreur.history) { 
+                [...currentLivreur.history].reverse().forEach(h => { 
+                    l.innerHTML += `
+                        <div class="order-card-pro" style="font-size:0.75rem; border-left: 3px solid #48bb78;">
+                            <b>${h.resName}</b><br>
+                            <small>${h.date} - ${h.time}</small> 
+                            ${h.earnings ? `<br><span style="color:var(--primary)">+${h.earnings} DZD</span>` : ''} ✅
+                        </div>
+                    `; 
+                }); 
+            } 
+        }
+
+        function renderClientPlats() { 
+            const l = document.getElementById('plats-list-client'); 
+            l.innerHTML = ''; 
+            const isOpen = currentRes.open !== false;
+            const isValid = checkAccountValidity(currentRes);
+            const canOrder = isOpen && isValid;
+            
+            if(currentRes.plats) currentRes.plats.forEach(p => { 
+                const qty = cart[p.id] ? cart[p.id].qte : 0; 
+                l.innerHTML += `
+                    <div class="order-card-pro">
+                        <img src="${p.img}" class="img-plat-client" onclick="toggleZoom(this)">
+                        <div style="flex:1">
+                            <b>${p.n}</b><br>
+                            ${p.p} DZD <br>
+                            <small>Dispo: ${p.stock}</small>
+                            ${!isValid ? '<br><small style="color: orange;">Service temporairement indisponible</small>' : ''}
+                        </div>
+                        <div style="display:flex; align-items:center">
+                            ${canOrder ? `
+                                <button class="btn-neo" onclick="changeQty(${p.id}, -1)">-</button>
+                                <span style="min-width:20px; text-align:center;">${qty}</span>
+                                <button class="btn-neo" onclick="changeQty(${p.id}, 1)">+</button>
+                            ` : ''}
+                        </div>
+                    </div>
+                `; 
+            }); 
+        }
+
+        function updateCartUI() { 
+            const f = document.getElementById('footer-cart'), l = document.getElementById('cart-items-list'); 
+            const keys = Object.keys(cart); 
+            if(!keys.length || !document.getElementById('view-menu-client').classList.contains('active')) { f.style.display='none'; return; } 
+            f.style.display='block'; 
+            
+            const isOpen = currentRes.open !== false;
+            const isValid = checkAccountValidity(currentRes);
+            const canOrder = isOpen && isValid;
+            
+            document.getElementById('footer-form-client').style.display = canOrder ? 'block' : 'none';
+            document.getElementById('footer-closed-msg').style.display = !canOrder ? 'block' : 'none';
+            
+            if (!canOrder) {
+                const msg = document.getElementById('footer-closed-msg');
+                if (msg) {
+                    msg.textContent = !isOpen ? 'RESTAURANT FERMÉ POUR LE MOMENT' : 'Service temporairement indisponible';
+                }
+            }
+
+            l.innerHTML = ''; let t = 0; 
+            keys.forEach(k => { 
+                t += cart[k].p * cart[k].qte; 
+                l.innerHTML += `<div style="padding:4px 0; border-bottom:1px solid var(--border);">${cart[k].qte}x ${cart[k].n}</div>`; 
+            }); 
+            document.getElementById('cart-total').innerText = t; 
+        }
+
+        function openClientMenu(rid) { 
+            currentRes = restaurants.find(x=>x.id===rid); 
+            showSection('view-menu-client'); 
+            document.getElementById('client-res-name').innerText = currentRes.name; 
+            
+            // Obtenir la localisation du restaurant
+            if (currentRes.location) {
+                const restaurantCoords = document.getElementById('restaurant-coords');
+                if (restaurantCoords) {
+                    restaurantCoords.textContent = `${currentRes.location.lat.toFixed(4)}, ${currentRes.location.lng.toFixed(4)}`;
+                }
+            }
+            
+            renderClientPlats(); 
+        }
+
+        function toggleZoom(img) { 
+            img.classList.toggle('zoom-image'); 
+        }
+
+        function openClientPin() { 
+            if(currentRes.open === false) return; 
+            if(!document.getElementById('c-name').value) return setNotif("NOM REQUIS"); 
+            document.getElementById('client-pin-container').style.display='block'; 
+            clientTempPin=""; 
+            document.getElementById('client-pin-view').innerText=""; 
+        }
+        
+        function closeClientPin() { 
+            document.getElementById('client-pin-container').style.display='none'; 
+        }
+        
+        function confirmClientOrder() { 
+            if(currentRes.open === false) {
+                setNotif("RESTAURANT FERMÉ");
+                return;
+            }
+            
+            // Vérifier la validité du compte
+            if(!checkAccountValidity(currentRes)) {
+                setNotif("Service temporairement indisponible");
+                return;
+            }
+            
+            if(clientTempPin.length < 4) return; 
+            const itemsList = Object.values(cart); 
+            const resIndex = restaurants.findIndex(r => r.id === currentRes.id); 
+            if(resIndex === -1) return;
+            if(!restaurants[resIndex].orders) restaurants[resIndex].orders = []; 
+            const orderId = Date.now();
+            const order = { 
+                id: orderId, 
+                client: document.getElementById('c-name').value, 
+                tel: document.getElementById('c-tel').value, 
+                rawItems: itemsList, 
+                itemsText: itemsList.map(i => `${i.qte}x ${i.n}`).join(', '), 
+                total: document.getElementById('cart-total').innerText, 
+                pin: clientTempPin, 
+                status: 'new',
+                timestamp: Date.now(),
+                clientLocation: userLocation
+            }; 
+            
+            let tracked = JSON.parse(localStorage.getItem('koul_tracked_orders') || "[]");
+            tracked.push({ resId: currentRes.id, orderId: orderId, rated: false });
+            localStorage.setItem('koul_tracked_orders', JSON.stringify(tracked));
+            itemsList.forEach(item => { 
+                const plat = restaurants[resIndex].plats.find(p => p.id === item.id); 
+                if(plat) plat.stock -= item.qte; 
+            });
+            restaurants[resIndex].orders.push(order); 
+            logResEvent(restaurants[resIndex], "NOUVELLE COMMANDE", order);
+            pushData(); 
+            setNotif("COMMANDE RÉUSSIE");
+            closeClientPin(); 
+            cart = {}; 
+            checkActiveOrder(); 
+            goToHome(); 
+        }
+
+        function closeDeliveryPin() { 
+            document.getElementById('delivery-validation-container').style.display='none'; 
+        }
+        
+        function confirmDelivery() {
+            const r = restaurants.find(x=>x.id===pendingResId); 
+            const idx = r.orders.findIndex(x=>x.id===pendingOrderId); 
+            const o = r.orders[idx];
+            if(deliveryTempPin === o.pin) {
+                const final = r.orders.splice(idx, 1)[0]; 
+                final.deliveryTime = Date.now();
+                logResEvent(r, `LIVRÉE PAR ${currentLivreur ? currentLivreur.name : 'PRO'}`, final);
+                if(currentLivreur) { 
+                    if(!currentLivreur.history) currentLivreur.history = []; 
+                    const now = new Date(); 
+                    const earnings = Math.floor(parseInt(final.total) * 0.15);
+                    currentLivreur.history.push({ 
+                        resName: r.name, 
+                        date: now.toLocaleDateString(), 
+                        time: String(now.getHours()).padStart(2, '0') + ":" + String(now.getMinutes()).padStart(2, '0'),
+                        earnings: earnings,
+                        orderId: final.id
+                    }); 
+                }
+                setNotif("LIVRÉ !"); 
+                pushData(); 
+                closeDeliveryPin(); 
+                if(currentLivreur) { 
+                    renderLivreurOrders(); 
+                    renderLivreurHistory(); 
+                } 
+                if(currentRes) { 
+                    renderProOrders(); 
+                    renderResHistory(); 
+                }
+            } else { 
+                setNotif("CODE INCORRECT"); 
+            }
+        }
 
         function checkActiveOrder() {
             let trackedOrders = JSON.parse(localStorage.getItem('koul_tracked_orders') || "[]");
@@ -300,7 +2204,7 @@
                 let statusTxt = "Préparation";
                 if(order.status === 'waiting') statusTxt = "Prête !";
                 if(order.status === 'shipping') statusTxt = "En livraison 🛵";
-                container.innerHTML += `<div class="tracker-line"><div class="status-dot"></div><div style="flex:1"><b>${res.name.toUpperCase()}</b>: ${statusTxt}</div><small style="background:#444; padding:2px 5px; border-radius:3px">CODE: ${order.pin}</small></div>`;
+                container.innerHTML += `<div class="tracker-line"><div class="status-dot"></div><div style="flex:1"><b>${res.name.toUpperCase()}</b>: ${statusTxt}</div><small style="background:var(--card-bg); padding:3px 6px; border-radius:4px;">CODE: ${order.pin}</small></div>`;
             });
             container.style.display = hasVisible ? 'block' : 'none';
         }
@@ -333,217 +2237,376 @@
             reader.onload = (event) => {
                 const img = new Image(); img.src = event.target.result;
                 img.onload = () => {
-                    const canvas = document.createElement('canvas'); const scale = maxWidth / img.width;
-                    canvas.width = maxWidth; canvas.height = img.height * scale;
-                    const ctx = canvas.getContext('2d'); ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                    const canvas = document.createElement('canvas'); 
+                    const scale = maxWidth / img.width;
+                    canvas.width = maxWidth; 
+                    canvas.height = img.height * scale;
+                    const ctx = canvas.getContext('2d'); 
+                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
                     callback(canvas.toDataURL('image/jpeg', 0.7));
                 };
             };
         }
 
         function refreshCurrentView() {
-            if(document.getElementById('view-admin-space').classList.contains('active')) { renderAdminResList(); renderAdminLivList(); renderAdminHistory(); }
-            if(document.getElementById('view-pro-space').classList.contains('active') && currentRes) { renderProOrders(); renderProPlats(); renderResHistory(); updateProStatusUI(); }
-            if(document.getElementById('view-livreur-space').classList.contains('active') && currentLivreur) { renderLivreurOrders(); renderLivreurHistory(); }
-            if(document.getElementById('view-menu-client').classList.contains('active')) { renderClientPlats(); updateCartUI(); }
+            if(document.getElementById('view-admin-space').classList.contains('active')) { 
+                renderAdminResList(); 
+                renderAdminLivList(); 
+                renderAdminHistory(); 
+            }
+            if(document.getElementById('view-pro-space').classList.contains('active') && currentRes) { 
+                renderProOrders(); 
+                renderProPlats(); 
+                renderResHistory(); 
+                updateProStatusUI(); 
+            }
+            if(document.getElementById('view-livreur-space').classList.contains('active') && currentLivreur) { 
+                renderLivreurOrders(); 
+                renderLivreurHistory(); 
+            }
+            if(document.getElementById('view-menu-client').classList.contains('active')) { 
+                renderClientPlats(); 
+                updateCartUI(); 
+            }
         }
 
-        function updateProStatusUI() {
-            const btn = document.getElementById('pro-toggle-status');
-            const isOpen = currentRes.open !== false;
-            btn.innerText = isOpen ? "OUVERT" : "FERMÉ";
-            btn.className = "toggle-status-btn " + (isOpen ? "status-open" : "status-closed");
+        function toggleSec(id) { 
+            const s = document.getElementById(id); 
+            s.style.display = (s.style.display==='block' || s.style.display==='') ? 'none' : 'block'; 
         }
 
-        function toggleResStatus() {
-            currentRes.open = (currentRes.open === false);
-            pushData();
-            setNotif(currentRes.open ? "RESTAURANT OUVERT" : "RESTAURANT FERMÉ");
+        function deleteRes(id) { 
+            const r = restaurants.find(x => x.id === id); 
+            if(confirm("Supprimer ce restaurant ?")) { 
+                logAdminEvent("SYSTEM", `Resto supprimé: ${r.name}`); 
+                restaurants = restaurants.filter(x => x.id !== id); 
+                pushData(); 
+                renderAdminResList(); 
+                updateStatistics();
+            } 
         }
 
-        const vibrate = (ms = 50) => { if(navigator.vibrate) navigator.vibrate(ms); };
-
-        function setNotif(msg) { 
-            vibrate(100); const bar = document.getElementById('notification-bar');
-            document.getElementById('notif-message').innerText = msg;
-            bar.style.backgroundColor = "#ffcc00"; bar.style.color = "#000";
-            setTimeout(() => { bar.style.backgroundColor = "#000"; bar.style.color = "#ffcc00"; document.getElementById('notif-message').innerText = promoMessage; }, 3000);
+        function deleteLiv(id) { 
+            const l = livreurs.find(x => x.id === id); 
+            if(confirm("Supprimer ce livreur ?")) { 
+                logAdminEvent("SYSTEM", `Livreur supprimé: ${l.name}`); 
+                livreurs = livreurs.filter(x => x.id !== id); 
+                pushData(); 
+                renderAdminLivList(); 
+                updateStatistics();
+            } 
         }
 
-        function pushData() { db.ref('cloud_koul').set({ restaurants: restaurants || [], livreurs: livreurs || [], adminHistory: adminHistory || [], promoMessage: promoMessage || "BIENVENUE" }); }
+        function updatePromoMessage() { 
+            const newTxt = document.getElementById('adm-promo-txt').value; 
+            if(newTxt) { 
+                promoMessage = newTxt; 
+                logAdminEvent("ADMIN", `Promo modifiée: ${newTxt}`); 
+                setNotif("MESSAGE PROMO MIS À JOUR"); 
+                pushData(); 
+            } 
+        }
 
-        function updatePromoMessage() { const newTxt = document.getElementById('adm-promo-txt').value; if(newTxt) { promoMessage = newTxt; logAdminEvent("ADMIN", `Promo modifiée: ${newTxt}`); setNotif("MESSAGE PROMO MIS À JOUR"); pushData(); } }
-
-        function generatePads() {
-            const pads = ['pad-main', 'numpad-client', 'numpad-delivery'];
-            pads.forEach(id => {
-                const el = document.getElementById(id); el.innerHTML = '';
-                for(let i=1; i<=9; i++) el.innerHTML += `<button class="num-btn" onclick="pressPad('${id}','${i}')">${i}</button>`;
-                el.innerHTML += `<button class="num-btn" style="color:red" onclick="pressPad('${id}','C')">C</button>`;
-                el.innerHTML += `<button class="num-btn" onclick="pressPad('${id}','0')">${0}</button>`;
-                el.innerHTML += `<button class="num-btn" style="color:green" onclick="submitPad('${id}')">OK</button>`;
+        function exportAdvancedData() { 
+            let csvContent = "data:text/csv;charset=utf-8,";
+            csvContent += "Type,Nom,Détails,Date,Heure,Total\n";
+            
+            restaurants.forEach(res => {
+                if (res.orders) {
+                    res.orders.forEach(order => {
+                        csvContent += `Commande,"${res.name}","${order.client}",${new Date(order.timestamp || Date.now()).toLocaleDateString()},${new Date(order.timestamp || Date.now()).toLocaleTimeString()},${order.total}\n`;
+                    });
+                }
             });
+            
+            livreurs.forEach(liv => {
+                if (liv.history) {
+                    liv.history.forEach(delivery => {
+                        csvContent += `Livraison,"${liv.name}","${delivery.resName}",${delivery.date},${delivery.time},""\n`;
+                    });
+                }
+            });
+            
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", `koul_data_${new Date().toISOString().split('T')[0]}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            setNotif("📊 Données exportées en CSV");
         }
 
-        function pressPad(id, v) {
-            vibrate(30);
-            if(id === 'pad-main') { if(v==='C') currentPin=""; else if(currentPin.length<4) currentPin+=v; document.getElementById('pin-view').innerText=currentPin.replace(/./g,'*'); }
-            if(id === 'numpad-client') { if(v==='C') clientTempPin=""; else if(clientTempPin.length<4) clientTempPin+=v; document.getElementById('client-pin-view').innerText=clientTempPin; }
-            if(id === 'numpad-delivery') { if(v==='C') deliveryTempPin=""; else if(deliveryTempPin.length<4) deliveryTempPin+=v; document.getElementById('delivery-pin-view').innerText=deliveryTempPin; }
+        function exportHistory() { 
+            let content = "HISTORIQUE KOUL\n\n"; 
+            adminHistory.forEach(h => { 
+                content += `[${h.date} ${h.time}] ${h.type}: ${h.details}\n`; 
+            }); 
+            const blob = new Blob([content], { type: 'text/plain' }); 
+            const url = URL.createObjectURL(blob); 
+            const a = document.createElement('a'); 
+            a.href = url; 
+            a.download = `koul_log.txt`; 
+            a.click(); 
         }
 
-        function submitPad(id) { if(id === 'pad-main') processLogin(); if(id === 'numpad-client') confirmClientOrder(); if(id === 'numpad-delivery') confirmDelivery(); }
-
-        function toggleLoginArea() { const a = document.getElementById('login-container'); a.style.display = a.style.display==='block'?'none':'block'; currentPin=""; document.getElementById('pin-view').innerText=""; }
-
-        function processLogin() {
-            const pin = currentPin; toggleLoginArea();
-            if(pin === "1747") { showSection('view-admin-space'); renderAdminResList(); renderAdminLivList(); renderAdminHistory(); } 
-            else {
-                const r = restaurants.find(x => x.code === pin), l = livreurs.find(x => x.code === pin);
-                if(r) { currentRes = r; showSection('view-pro-space'); document.getElementById('pro-res-title').innerText = r.name; renderProOrders(); renderProPlats(); renderResHistory(); updateProStatusUI(); }
-                else if(l) { currentLivreur = l; showSection('view-livreur-space'); document.getElementById('liv-name').innerText = l.name; renderLivreurOrders(); renderLivreurHistory(); }
-                else { vibrate([50, 50, 50]); setNotif("CODE ERRONÉ"); }
+        function clearHistory() {
+            if(confirm("Vider tout l'historique ? Cette action est irréversible.")) {
+                adminHistory = [];
+                logAdminEvent("SYSTEM", "Historique vidé par l'admin");
+                renderAdminHistory();
+                pushData();
+                setNotif("🗑️ Historique vidé");
             }
         }
 
-        function showSection(id) { 
-            document.querySelectorAll('.view-section').forEach(s => s.classList.remove('active')); 
-            document.getElementById(id).classList.add('active'); 
-            document.getElementById('footer-cart').style.display = (id === 'view-menu-client' && Object.keys(cart).length > 0) ? 'block' : 'none';
+        function logoutLivreur() { 
+            currentLivreur = null; 
+            goToHome(); 
         }
-
-        function goToHome() { cart = {}; currentRes = null; currentLivreur = null; showSection('view-restaurants'); init(); }
-
-        function adminCreateRes() {
-            const n = document.getElementById('adm-res-n').value, c = document.getElementById('adm-res-c').value, f = document.getElementById('adm-res-img').files[0];
-            if(n && c) {
-                const add = (imgData) => { restaurants.push({id:Date.now(), name:n, code:c, img:imgData, plats:[], orders:[], eventHistory:[], open: true}); logAdminEvent("SYSTEM", `Resto créé: ${n}`); renderAdminResList(); setNotif("RESTO AJOUTÉ"); pushData(); };
-                if(f) compressImage(f, 400, add); else add('');
-            }
-        }
-        function adminCreateLiv() {
-            const n = document.getElementById('adm-liv-n').value, c = document.getElementById('adm-liv-c').value, f = document.getElementById('adm-liv-img').files[0];
-            if(n && c) {
-                const add = (imgData) => { livreurs.push({id:Date.now(), name:n, code:c, img:imgData, history:[]}); logAdminEvent("SYSTEM", `Livreur créé: ${n}`); renderAdminLivList(); setNotif("LIVREUR AJOUTÉ"); pushData(); };
-                if(f) compressImage(f, 300, add); else add('');
-            }
-        }
-        function logAdminEvent(type, details) { const now = new Date(); adminHistory.unshift({ type, details, time: String(now.getHours()).padStart(2, '0') + ":" + String(now.getMinutes()).padStart(2, '0'), date: now.toLocaleDateString() }); pushData(); }
-        function logResEvent(res, status, order) { if(!res.eventHistory) res.eventHistory = []; const now = new Date(); const timeStr = String(now.getHours()).padStart(2, '0') + ":" + String(now.getMinutes()).padStart(2, '0'); res.eventHistory.unshift({ status, client: order.client, items: order.itemsText || (order.items ? order.items.join(', ') : ''), time: timeStr, date: now.toLocaleDateString() }); logAdminEvent(res.name.toUpperCase(), `${status} - Client: ${order.client}`); }
-        
-        function renderAdminResList() { const l = document.getElementById('list-res-to-manage'); l.innerHTML = ''; restaurants.forEach((r) => l.innerHTML += `<div style="display:flex;justify-content:space-between;background:#222;padding:5px;margin-bottom:2px"><span>${r.name} <b>(Code: ${r.code})</b></span><button onclick="deleteRes(${r.id})" style="color:red;border:none;background:none">X</button></div>`); }
-        function deleteRes(id) { const r = restaurants.find(x => x.id === id); if(confirm("Supprimer ce restaurant ?")) { logAdminEvent("SYSTEM", `Resto supprimé: ${r.name}`); restaurants = restaurants.filter(x => x.id !== id); pushData(); renderAdminResList(); } }
-        function renderAdminLivList() { const l = document.getElementById('list-liv-to-manage'); l.innerHTML = ''; livreurs.forEach((liv) => l.innerHTML += `<div style="display:flex;justify-content:space-between;background:#222;padding:5px;margin-bottom:2px"><span>${liv.name} <b>(Code: ${liv.code})</b></span><button onclick="deleteLiv(${liv.id})" style="color:red;border:none;background:none">X</button></div>`); }
-        function deleteLiv(id) { const l = livreurs.find(x => x.id === id); if(confirm("Supprimer ce livreur ?")) { logAdminEvent("SYSTEM", `Livreur supprimé: ${l.name}`); livreurs = livreurs.filter(x => x.id !== id); pushData(); renderAdminLivList(); } }
-        function renderAdminHistory() { const l = document.getElementById('admin-hist-list'); l.innerHTML = ''; adminHistory.forEach(h => { l.innerHTML += `<div class="hist-card"><span class="type-tag">${h.type}</span><br><b>${h.details}</b><br><small>${h.date} ${h.time}</small></div>`; }); }
-        function clearHistory() { adminHistory = []; pushData(); showClearConfirm(false); setNotif("HISTORIQUE VIDÉ"); }
 
         function addNewPlat() {
             const nInput = document.getElementById('new-n'), pInput = document.getElementById('new-p'), sInput = document.getElementById('new-s'), imgInput = document.getElementById('new-img');
             if(nInput.value && pInput.value) {
-                const add = (imgData) => { if(!currentRes.plats) currentRes.plats = []; currentRes.plats.push({id:Date.now(), n:nInput.value, p:parseInt(pInput.value), stock:parseInt(sInput.value)||0, img:imgData}); logAdminEvent(currentRes.name, `Plat ajouté: ${nInput.value}`); setNotif("PLAT AJOUTÉ"); renderProPlats(); nInput.value = ""; pInput.value = ""; sInput.value = ""; imgInput.value = ""; pushData(); };
+                const add = (imgData) => { 
+                    if(!currentRes.plats) currentRes.plats = []; 
+                    currentRes.plats.push({
+                        id:Date.now(), 
+                        n:nInput.value, 
+                        p:parseInt(pInput.value), 
+                        stock:parseInt(sInput.value)||0, 
+                        img:imgData
+                    }); 
+                    logAdminEvent(currentRes.name, `Plat ajouté: ${nInput.value}`); 
+                    setNotif("PLAT AJOUTÉ"); 
+                    renderProPlats(); 
+                    nInput.value = ""; 
+                    pInput.value = ""; 
+                    sInput.value = ""; 
+                    imgInput.value = ""; 
+                    pushData(); 
+                };
                 if(imgInput.files[0]) compressImage(imgInput.files[0], 500, add); else add('');
             }
         }
-        function renderProPlats() { const l = document.getElementById('manage-plats'); l.innerHTML = ''; if(currentRes.plats) currentRes.plats.forEach((p, i) => { l.innerHTML += `<div class="plat-manage-card"><img src="${p.img}" class="mini-img"><div style="flex:1"><b>${p.n}</b><br><small>${p.p} DZD</small></div><div style="display:flex; align-items:center"><input type="number" value="${p.stock}" id="stk-${i}" style="width:50px; background:#222; border:1px solid #555; color:white; padding:5px"><button class="btn-icon" onclick="updateStock(${i})">OK</button><button class="btn-icon" onclick="deletePlat(${p.id})" style="color:red">X</button></div></div>`; }); }
-        function deletePlat(id) { const p = currentRes.plats.find(x => x.id === id); logAdminEvent(currentRes.name, `Plat supprimé: ${p.n}`); currentRes.plats = currentRes.plats.filter(x => x.id !== id); pushData(); renderProPlats(); }
-        function updateStock(i) { const p = currentRes.plats[i]; const newStk = parseInt(document.getElementById(`stk-${i}`).value); logAdminEvent(currentRes.name, `Stock ${p.n} : ${p.stock} -> ${newStk}`); p.stock = newStk; setNotif("STOCK MIS À JOUR"); pushData(); }
-        function renderProOrders() {
-            const l = document.getElementById('orders-list-pro'); l.innerHTML = '';
-            if(currentRes.orders && currentRes.orders.length > 0) {
-                currentRes.orders.forEach((o, i) => {
-                    let statusColor = o.status === 'new' ? 'white' : (o.status === 'waiting' ? 'orange' : 'cyan');
-                    let statusText = o.status === 'new' ? 'REÇUE' : (o.status === 'waiting' ? 'PUBLIÉE' : (o.livName ? `Prise par ${o.livName}` : 'EN COURS'));
-                    l.innerHTML += `<div class="order-card-pro" style="border-left: 5px solid ${statusColor}"><div style="display:flex; justify-content:space-between"><b>${o.client}</b> <small>${statusText}</small></div><small>${o.itemsText}</small><br><b>${o.total} DZD</b><div class="order-actions"><a href="tel:${o.tel}" class="btn-call">APPELER</a>${o.status === 'new' ? `<button class="btn-finish" onclick="updateOrderStatus(${i}, 'waiting')">PUBLIER</button>` : ''}<button class="btn-reject" onclick="cancelOrder(${o.id})">SUPPRIMER</button>${o.status === 'waiting' || o.status === 'shipping' ? `<button class="btn-finish" style="background:#28a745" onclick="openValPin(${currentRes.id}, ${o.id})">CLÔTURER</button>` : ''}</div></div>`;
-                });
-            } else { l.innerHTML = '<p style="text-align:center; color:#888;">Aucune commande en cours.</p>'; }
-        }
-        function updateOrderStatus(idx, status) { const o = currentRes.orders[idx]; o.status = status; logResEvent(currentRes, "COMMANDE PUBLIÉE", o); renderProOrders(); setNotif("COMMANDE PUBLIÉE"); pushData(); }
-        function cancelOrder(oid) { if(!confirm("Supprimer définitivement cette commande ?")) return; const idx = currentRes.orders.findIndex(x => x.id === oid); if(idx > -1) { const o = currentRes.orders[idx]; o.rawItems.forEach(item => { const plat = currentRes.plats.find(p => p.id === item.id); if(plat) plat.stock += item.qte; }); logResEvent(currentRes, "COMMANDE SUPPRIMÉE", o); currentRes.orders.splice(idx, 1); renderProOrders(); setNotif("COMMANDE SUPPRIMÉE"); pushData(); } }
-        function renderResHistory() { const l = document.getElementById('res-event-log'); if(!l) return; l.innerHTML = ''; if(!currentRes.eventHistory || currentRes.eventHistory.length === 0) { l.innerHTML = '<p style="color:#888; font-size:0.8rem">Aucun événement.</p>'; return; } currentRes.eventHistory.forEach(ev => { l.innerHTML += `<div class="hist-card" style="font-size:0.75rem;"><small>${ev.date} ${ev.time}</small><br><b>${ev.status}</b> - ${ev.client}</div>`; }); }
 
-        function hasActiveOrder(livId) { let active = false; restaurants.forEach(res => { if(res.orders && res.orders.some(o => o.livId === livId && o.status === 'shipping')) active = true; }); return active; }
-        function renderLivreurOrders() {
-            const l = document.getElementById('liv-orders'); l.innerHTML = '<h3>Missions</h3>';
-            const isBusy = hasActiveOrder(currentLivreur.id);
-            const myHiddenOrders = JSON.parse(localStorage.getItem(`koul_hidden_orders_${currentLivreur.id}`) || '[]');
-            restaurants.forEach(res => {
-                if(res.orders) res.orders.forEach(o => {
-                    if(!myHiddenOrders.includes(o.id) && (o.status === 'waiting' || (o.status === 'shipping' && o.livId === currentLivreur.id))) {
-                        const canTake = !isBusy && o.status === 'waiting';
-                        const isBeingShippedByMe = o.status === 'shipping' && o.livId === currentLivreur.id;
-                        l.innerHTML += `<div class="order-card-pro"><b style="color:var(--primary)">${res.name}</b><br><b>Client: ${o.client}</b><br><div class="order-actions">${canTake ? `<button class="btn-finish" onclick="takeOrd(${res.id}, ${o.id})">PRENDRE</button>` : ''}${o.status === 'waiting' ? `<button class="btn-reject" onclick="ignoreOrd(${o.id})">MASQUER</button>` : ''}${isBeingShippedByMe ? `<a href="tel:${o.tel}" class="btn-call">APPELER</a>` : ''}${isBeingShippedByMe ? `<button class="btn-finish" style="background:#28a745" onclick="openValPin(${res.id}, ${o.id})">VALIDER LIVRAISON</button>` : ''}</div>${isBusy && o.status === 'waiting' ? '<small style="color:orange">Terminez votre livraison actuelle pour en prendre une autre.</small>' : ''}</div>`;
-                    }
-                });
-            });
+        // Fonctions de modification de validité
+        function openEditModal(accountId, accountType) {
+            editingAccountId = accountId;
+            editingAccountType = accountType;
+            document.getElementById('edit-modal').style.display = 'block';
+            document.getElementById('edit-days').value = 30;
         }
-        function takeOrd(rid, oid) { if(hasActiveOrder(currentLivreur.id)) return setNotif("VOUS AVEZ DÉJÀ UNE LIVRAISON"); const r = restaurants.find(x=>x.id===rid); const o = r.orders.find(x=>x.id===oid); o.status = 'shipping'; o.livId = currentLivreur.id; o.livName = currentLivreur.name; logResEvent(r, `PRISE PAR LIVREUR (${currentLivreur.name})`, o); setNotif("COMMANDE RÉCUPÉRÉE"); renderLivreurOrders(); pushData(); }
-        function ignoreOrd(oid) { const storageKey = `koul_hidden_orders_${currentLivreur.id}`; let myHiddenOrders = JSON.parse(localStorage.getItem(storageKey) || '[]'); myHiddenOrders.push(oid); localStorage.setItem(storageKey, JSON.stringify(myHiddenOrders)); renderLivreurOrders(); setNotif("COMMANDE MASQUÉE"); }
-        function openValPin(rid, oid) { pendingResId = rid; pendingOrderId = oid; deliveryTempPin = ""; document.getElementById('delivery-pin-view').innerText = ""; document.getElementById('delivery-validation-container').style.display = 'block'; }
-        function closeDeliveryPin() { document.getElementById('delivery-validation-container').style.display = 'none'; }
-        function confirmDelivery() {
-            const r = restaurants.find(x=>x.id===pendingResId); const idx = r.orders.findIndex(x=>x.id===pendingOrderId); const o = r.orders[idx];
-            if(deliveryTempPin === o.pin) {
-                const final = r.orders.splice(idx, 1)[0]; logResEvent(r, `LIVRÉE PAR ${currentLivreur ? currentLivreur.name : 'PRO'}`, final);
-                if(currentLivreur) { if(!currentLivreur.history) currentLivreur.history = []; const now = new Date(); currentLivreur.history.push({ resName: r.name, date: now.toLocaleDateString(), time: String(now.getHours()).padStart(2, '0') + ":" + String(now.getMinutes()).padStart(2, '0') }); }
-                setNotif("LIVRÉ !"); pushData(); closeDeliveryPin(); if(currentLivreur) { renderLivreurOrders(); renderLivreurHistory(); } if(currentRes) { renderProOrders(); renderResHistory(); }
-            } else { vibrate([50, 50]); setNotif("CODE INCORRECT"); }
-        }
-        function renderLivreurHistory() { const l = document.getElementById('liv-hist'); l.innerHTML = '<h4>Historique</h4>'; if(currentLivreur.history) { [...currentLivreur.history].reverse().forEach(h => { l.innerHTML += `<div style="font-size:0.75rem; background:#1a1a1a; padding:8px; margin-bottom:5px; border-left: 3px solid #28a745;"><b>${h.resName}</b><br><small>${h.date} - ${h.time}</small> ✅</div>`; }); } }
 
-        function init() { const grid = document.getElementById('res-grid'); grid.innerHTML = ''; restaurants.forEach(res => { const closed = res.open === false ? '<div class="closed-badge">FERMÉ</div>' : ''; grid.innerHTML += `<div class="card" onclick="openClientMenu(${res.id})">${closed}<img src="${res.img || 'https://via.placeholder.com/150'}"><br><b>${res.name}</b></div>`; }); generatePads(); }
-        function openClientMenu(rid) { currentRes = restaurants.find(x=>x.id===rid); showSection('view-menu-client'); document.getElementById('client-res-name').innerText = currentRes.name; renderClientPlats(); }
-        function toggleZoom(img) { img.classList.toggle('zoom-image'); }
-        function renderClientPlats() { 
-            const l = document.getElementById('plats-list-client'); l.innerHTML = ''; 
-            const isOpen = currentRes.open !== false;
-            if(currentRes.plats) currentRes.plats.forEach(p => { 
-                const qty = cart[p.id] ? cart[p.id].qte : 0; 
-                l.innerHTML += `<div style="display:flex; align-items:center; gap:10px; background:#333; padding:10px; border-radius:10px; margin-bottom:10px"><img src="${p.img}" class="img-plat-client" onclick="toggleZoom(this)"><div style="flex:1"><b>${p.n}</b><br>${p.p} DZD <br><small>Dispo: ${p.stock}</small></div><div style="display:flex; align-items:center; gap:10px">${isOpen ? `<button onclick="changeQty(${p.id}, -1)">-</button><span>${qty}</span><button onclick="changeQty(${p.id}, 1)">+</button>` : ''}</div></div>`; 
-            }); 
+        function closeEditModal() {
+            document.getElementById('edit-modal').style.display = 'none';
+            editingAccountId = null;
+            editingAccountType = null;
         }
-        function changeQty(pid, d) { if(currentRes.open === false) return; const p = currentRes.plats.find(x=>x.id===pid); if(d > 0 && p.stock <= (cart[pid]?.qte || 0)) return setNotif("STOCK ÉPUISÉ"); if(!cart[pid]) cart[pid] = { n:p.n, p:p.p, qte:0, id: p.id }; cart[pid].qte += d; if(cart[pid].qte <= 0) delete cart[pid]; renderClientPlats(); updateCartUI(); }
-        function updateCartUI() { 
-            const f = document.getElementById('footer-cart'), l = document.getElementById('cart-items-list'); 
-            const keys = Object.keys(cart); 
-            if(!keys.length || !document.getElementById('view-menu-client').classList.contains('active')) { f.style.display='none'; return; } 
-            f.style.display='block'; 
+
+        function confirmEditValidity() {
+            const daysToAdd = parseInt(document.getElementById('edit-days').value);
+            if (!daysToAdd || daysToAdd <= 0) {
+                setNotif("Nombre de jours invalide");
+                return;
+            }
+
+            const account = editingAccountType === 'restaurant' 
+                ? restaurants.find(r => r.id === editingAccountId)
+                : livreurs.find(l => l.id === editingAccountId);
+
+            if (!account) {
+                console.error('Compte non trouvé:', editingAccountId, editingAccountType);
+                setNotif("Compte non trouvé");
+                return;
+            }
+
+            // Gérer les comptes expirés
+            const now = new Date();
+            let currentEndDate;
             
-            const isOpen = currentRes.open !== false;
-            document.getElementById('footer-form-client').style.display = isOpen ? 'block' : 'none';
-            document.getElementById('footer-closed-msg').style.display = isOpen ? 'none' : 'block';
+            if (account.validityEndDate) {
+                currentEndDate = new Date(account.validityEndDate);
+                // Si le compte est expiré, on part de la date actuelle
+                if (currentEndDate < now) {
+                    currentEndDate = new Date();
+                }
+            } else {
+                // Si pas de date de validité, on part de maintenant
+                currentEndDate = new Date();
+            }
+            
+            const newEndDate = new Date(currentEndDate);
+            newEndDate.setDate(newEndDate.getDate() + daysToAdd);
+            
+            account.validityEndDate = newEndDate.toISOString();
 
-            l.innerHTML = ''; let t = 0; keys.forEach(k => { t += cart[k].p * cart[k].qte; l.innerHTML += `<div>${cart[k].qte}x ${cart[k].n}</div>`; }); document.getElementById('cart-total').innerText = t; 
+            logAdminEvent("SYSTEM", `Validité étendue: ${account.name} (+${daysToAdd} jours)`);
+            setNotif(`✅ Validité étendue de ${daysToAdd} jours`);
+            
+            renderAdminResList();
+            renderAdminLivList();
+            pushData();
+            closeEditModal();
         }
-        function openClientPin() { if(currentRes.open === false) return; if(!document.getElementById('c-name').value) return setNotif("NOM REQUIS"); document.getElementById('client-pin-container').style.display='block'; clientTempPin=""; document.getElementById('client-pin-view').innerText=""; }
-        function closeClientPin() { document.getElementById('client-pin-container').style.display='none'; }
-        
-        function confirmClientOrder() { 
-            if(currentRes.open === false) return;
-            if(clientTempPin.length < 4) return; 
-            const itemsList = Object.values(cart); 
-            const resIndex = restaurants.findIndex(r => r.id === currentRes.id);
-            if(resIndex === -1) return;
-            if(!restaurants[resIndex].orders) restaurants[resIndex].orders = []; 
-            const orderId = Date.now();
-            const order = { id: orderId, client: document.getElementById('c-name').value, tel: document.getElementById('c-tel').value, rawItems: itemsList, itemsText: itemsList.map(i => `${i.qte}x ${i.n}`).join(', '), total: document.getElementById('cart-total').innerText, pin: clientTempPin, status: 'new' }; 
-            let tracked = JSON.parse(localStorage.getItem('koul_tracked_orders') || "[]");
-            tracked.push({ resId: currentRes.id, orderId: orderId, rated: false });
-            localStorage.setItem('koul_tracked_orders', JSON.stringify(tracked));
-            itemsList.forEach(item => { const plat = restaurants[resIndex].plats.find(p => p.id === item.id); if(plat) plat.stock -= item.qte; });
-            restaurants[resIndex].orders.push(order); 
-            logResEvent(restaurants[resIndex], "NOUVELLE COMMANDE", order);
+
+        // Fonctions de gestion des commandes
+        function updateOrderStatus(idx, status) { 
+            const o = currentRes.orders[idx]; 
+            o.status = status; 
+            o.timestamp = Date.now();
+            logResEvent(currentRes, "COMMANDE PUBLIÉE", o); 
+            renderProOrders(); 
+            setNotif("COMMANDE PUBLIÉE"); 
             pushData(); 
-            setNotif("COMMANDE RÉUSSIE"); closeClientPin(); cart = {}; checkActiveOrder(); goToHome(); 
+            updateStatistics();
         }
 
-        function showClearConfirm(show = true) { document.getElementById('clear-confirm-panel').style.display = show ? 'block' : 'none'; }
-        function toggleSec(id) { const s = document.getElementById(id); s.style.display = (s.style.display==='block' || s.style.display==='') ? 'none' : 'block'; }
-        function logoutLivreur() { currentLivreur = null; goToHome(); }
-        function exportHistory() { let content = "HISTORIQUE KOUL\n\n"; adminHistory.forEach(h => { content += `[${h.date} ${h.time}] ${h.type}: ${h.details}\n`; }); const blob = new Blob([content], { type: 'text/plain' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `koul_log.txt`; a.click(); }
-        init();
+        function cancelOrder(oid) { 
+            if(!confirm("Supprimer définitivement cette commande ?")) return; 
+            const idx = currentRes.orders.findIndex(x => x.id === oid); 
+            if(idx > -1) { 
+                const o = currentRes.orders[idx]; 
+                o.rawItems.forEach(item => { 
+                    const plat = currentRes.plats.find(p => p.id === item.id); 
+                    if(plat) plat.stock += item.qte; 
+                }); 
+                logResEvent(currentRes, "COMMANDE SUPPRIMÉE", o); 
+                currentRes.orders.splice(idx, 1); 
+                renderProOrders(); 
+                setNotif("COMMANDE SUPPRIMÉE"); 
+                pushData(); 
+                updateStatistics();
+            } 
+        }
+
+        function updateStock(i) { 
+            const p = currentRes.plats[i]; 
+            const newStk = parseInt(document.getElementById(`stk-${i}`).value); 
+            logAdminEvent(currentRes.name, `Stock ${p.n} : ${p.stock} -> ${newStk}`); 
+            p.stock = newStk; 
+            setNotif("STOCK MIS À JOUR"); 
+            pushData(); 
+        }
+
+        function deletePlat(id) { 
+            const p = currentRes.plats.find(x => x.id === id); 
+            logAdminEvent(currentRes.name, `Plat supprimé: ${p.n}`); 
+            currentRes.plats = currentRes.plats.filter(x => x.id !== id); 
+            pushData(); 
+            renderProPlats(); 
+        }
+
+        function hasActiveOrder(livId) { 
+            let active = false; 
+            restaurants.forEach(res => { 
+                if(res.orders && res.orders.some(o => o.livId === livId && o.status === 'shipping')) active = true; 
+            }); 
+            return active; 
+        }
+
+        function takeOrd(rid, oid) { 
+            if(hasActiveOrder(currentLivreur.id)) return setNotif("VOUS AVEZ DÉJÀ UNE LIVRAISON"); 
+            const r = restaurants.find(x=>x.id===rid); 
+            const o = r.orders.find(x=>x.id===oid); 
+            o.status = 'shipping'; 
+            o.livId = currentLivreur.id; 
+            o.livName = currentLivreur.name; 
+            o.shippingTime = Date.now();
+            logResEvent(r, `PRISE PAR LIVREUR (${currentLivreur.name})`, o); 
+            setNotif("COMMANDE RÉCUPÉRÉE"); 
+            renderLivreurOrders(); 
+            pushData(); 
+            updateStatistics();
+            
+            // Afficher l'itinéraire vers le restaurant
+            if (currentLivreur.location && r.location) {
+                showDirectionsToRestaurant(r.location);
+            }
+        }
+        
+        function ignoreOrd(oid) { 
+            const storageKey = `koul_hidden_orders_${currentLivreur.id}`; 
+            let myHiddenOrders = JSON.parse(localStorage.getItem(storageKey) || '[]'); 
+            myHiddenOrders.push(oid); 
+            localStorage.setItem(storageKey, JSON.stringify(myHiddenOrders)); 
+            renderLivreurOrders(); 
+            setNotif("COMMANDE MASQUÉE"); 
+        }
+        
+        function openValPin(rid, oid) { 
+            pendingResId = rid; 
+            pendingOrderId = oid; 
+            deliveryTempPin = ""; 
+            document.getElementById('delivery-pin-view').innerText = ""; 
+            document.getElementById('delivery-validation-container').style.display = 'block'; 
+        }
+
+        function showDirectionsToRestaurant(restaurantLocation) {
+            if (!currentLivreur.location || !restaurantLocation) return;
+            
+            const url = `https://www.google.com/maps/dir/?api=1&origin=${currentLivreur.location.lat},${currentLivreur.location.lng}&destination=${restaurantLocation.lat},${restaurantLocation.lng}&travelmode=driving`;
+            window.open(url, '_blank');
+        }
+
+        function showDirectionsToClient(clientLocation) {
+            if (!currentRes.location || !clientLocation) return;
+            
+            const url = `https://www.google.com/maps/dir/?api=1&origin=${currentRes.location.lat},${currentRes.location.lng}&destination=${clientLocation.lat},${clientLocation.lng}&travelmode=driving`;
+            window.open(url, '_blank');
+        }
+
+        function changeQty(pid, d) { 
+            // Vérifier si le restaurant est ouvert ET valide
+            if(currentRes.open === false) {
+                setNotif("RESTAURANT FERMÉ");
+                return;
+            }
+            
+            // Vérifier la validité du compte
+            if(!checkAccountValidity(currentRes)) {
+                setNotif("Service temporairement indisponible");
+                return;
+            }
+            
+            const p = currentRes.plats.find(x=>x.id===pid); 
+            if(d > 0 && p.stock <= (cart[pid]?.qte || 0)) return setNotif("STOCK ÉPUISÉ"); 
+            if(!cart[pid]) cart[pid] = { n:p.n, p:p.p, qte:0, id: p.id }; 
+            cart[pid].qte += d; 
+            if(cart[pid].qte <= 0) delete cart[pid]; 
+            renderClientPlats(); 
+            updateCartUI(); 
+        }
+
+        function syncOfflineData() {
+            const offlineActions = JSON.parse(localStorage.getItem('koul_offline_actions') || '[]');
+            
+            offlineActions.forEach(action => {
+                switch (action.type) {
+                    case 'order':
+                        // Synchroniser la commande
+                        break;
+                    case 'rating':
+                        // Synchroniser la notation
+                        break;
+                }
+            });
+            
+            localStorage.removeItem('koul_offline_actions');
+        }
+
+        // Initialisation
+        document.addEventListener('DOMContentLoaded', () => {
+            loadTheme();
+            updateOnlineStatus();
+            initGeolocation();
+            generatePads();
+            updateStatistics();
+        });
+
+        window.addEventListener('online', updateOnlineStatus);
+        window.addEventListener('offline', updateOnlineStatus);
     </script>
 </body>
 </html>
-
