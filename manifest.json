@@ -1,23 +1,14 @@
-{
-  "name": "Koul",
-  "short_name": "Koul",
-  "description": "Application Koul",
-  "start_url": "./index.html",
-  "display": "standalone",
-  "orientation": "portrait",
-  "background_color": "#121212",
-  "theme_color": "#ffcc00",
-  "icons": [
+"icons": [
     {
-      "src": "./icone.png",
+      "src": "icon.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "./icone.png",
+      "src": "icon.png", 
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any maskable"
     }
   ]
-}
